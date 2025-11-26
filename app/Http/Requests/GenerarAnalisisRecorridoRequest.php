@@ -20,8 +20,8 @@ class GenerarAnalisisRecorridoRequest extends FormRequest
             'hora_desde'   => ['nullable', 'date_format:H:i'],
             'hora_hasta'   => ['nullable', 'date_format:H:i'],
 
-            'device_ids'   => ['required', 'array', 'min:1'],
-            'device_ids.*' => ['integer'],
+            'vehiculo_ids'   => ['required', 'array', 'min:1'],
+            'vehiculo_ids.*' => ['integer', 'exists:vehiculos,id'],
 
             'formato'      => ['required', 'in:excel,pdf'],
             'modo'         => ['required', 'in:semanal,mensual'],

@@ -8,6 +8,7 @@ use App\Exceptions\ApiException;
 use App\Http\Requests\GenerarAnalisisRecorridoRequest;
 use App\Services\Ecuatracker\EcuatrackerClient;
 use App\Services\Reportes\AnalisisRecorridoService;
+use App\Models\Vehiculo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -73,9 +74,17 @@ class ReporteAnalisisRecorridoController extends Controller
                 ]);
         }
 
-        $deviceIds = array_map('intval', $data['device_ids']);
-        $modo      = $data['modo'];    // semanal | mensual
-        $formato   = $data['formato']; // excel | pdf
+        // Convertimos vehiculo_ids → device_ids
+        $vehiculoIds = array_map('intval', $data['vehiculo_ids']);
+
+        $deviceIds = Vehiculo::whereIn('id', $vehiculoIds)
+            ->pluck('device_id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $modo    = $data['modo'];
+        $formato = $data['formato'];
 
         try {
             //OJO* Seguridad: aquí en el futuro puedes validar que los device_ids

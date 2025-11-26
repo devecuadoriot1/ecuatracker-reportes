@@ -26,6 +26,7 @@ class Vehiculo extends Model
     ];
 
     protected $casts = [
-        'anio' => 'integer',
+        'device_id' => 'integer',
+        'anio'      => 'integer',
     ];
 }
