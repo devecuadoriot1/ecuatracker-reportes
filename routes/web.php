@@ -1,20 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ReporteAnalisisRecorridoController;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-//use App\Http\Controllers\ReporteAnalisisRecorridoController;
+Route::get('reportes/analisis-recorrido', [ReporteAnalisisRecorridoController::class, 'create'])
+    ->name('reportes.analisis_recorrido.create');
 
-// Route::middleware(['web']) //OJO* puedes quitar 'auth' mientras pruebas
-//     ->prefix('reportes')
-//     ->name('reportes.')
-//     ->group(function () {
-//         Route::get('analisis-recorrido', [ReporteAnalisisRecorridoController::class, 'create'])
-//             ->name('analisis_recorrido.create');
-
-//         Route::post('analisis-recorrido', [ReporteAnalisisRecorridoController::class, 'store'])
-//             ->name('analisis_recorrido.store');
-//     });
+Route::post('reportes/analisis-recorrido', [ReporteAnalisisRecorridoController::class, 'store'])
+    ->name('reportes.analisis_recorrido.store');

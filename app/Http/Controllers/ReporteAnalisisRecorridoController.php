@@ -8,6 +8,7 @@ use App\Exceptions\ApiException;
 use App\Http\Requests\GenerarAnalisisRecorridoRequest;
 use App\Services\Ecuatracker\EcuatrackerClient;
 use App\Services\Reportes\AnalisisRecorridoService;
+use App\Models\Vehiculo;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -29,27 +30,38 @@ class ReporteAnalisisRecorridoController extends Controller
     /**
      * Carga datos base para el formulario de análisis de recorrido.
      */
-    public function create(Request $request): RedirectResponse|\Illuminate\View\View
-    {
-        try {
-            $devices = $this->ecuatrackerClient->getDevices();
-            $groups  = $this->ecuatrackerClient->getDeviceGroups();
-        } catch (ApiException $e) {
-            Log::error('Error cargando devices/groups para formulario de reporte', [
-                'error'   => $e->getMessage(),
-                'context' => $e->getContext(),
-            ]);
 
-            return back()->withErrors([
-                'api' => 'No se pudo obtener la lista de dispositivos desde Ecuatracker. Intente nuevamente.',
-            ]);
-        }
+    public function create(Request $request)
+    {
+        $vehiculos = Vehiculo::orderBy('nombre_api')
+            ->orderBy('placas')
+            ->get();
 
         return view('reportes.analisis_recorrido.create', [
-            'devices' => $devices,
-            'groups'  => $groups,
+            'vehiculos' => $vehiculos,
         ]);
     }
+    // public function create(Request $request): RedirectResponse|\Illuminate\View\View
+    // {
+    //     try {
+    //         $devices = $this->ecuatrackerClient->getDevices();
+    //         $groups  = $this->ecuatrackerClient->getDeviceGroups();
+    //     } catch (ApiException $e) {
+    //         Log::error('Error cargando devices/groups para formulario de reporte', [
+    //             'error'   => $e->getMessage(),
+    //             'context' => $e->getContext(),
+    //         ]);
+
+    //         return back()->withErrors([
+    //             'api' => 'No se pudo obtener la lista de dispositivos desde Ecuatracker. Intente nuevamente.',
+    //         ]);
+    //     }
+
+    //     return view('reportes.analisis_recorrido.create', [
+    //         'devices' => $devices,
+    //         'groups'  => $groups,
+    //     ]);
+    // }
 
     /**
      * Procesa la solicitud y genera el reporte (JSON/Excel/PDF).
@@ -73,9 +85,17 @@ class ReporteAnalisisRecorridoController extends Controller
                 ]);
         }
 
-        $deviceIds = array_map('intval', $data['device_ids']);
-        $modo      = $data['modo'];    // semanal | mensual
-        $formato   = $data['formato']; // excel | pdf
+        // Convertimos vehiculo_ids → device_ids
+        $vehiculoIds = array_map('intval', $data['vehiculo_ids']);
+
+        $deviceIds = Vehiculo::whereIn('id', $vehiculoIds)
+            ->pluck('device_id')
+            ->map(fn($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $modo    = $data['modo'];
+        $formato = $data['formato'];
 
         try {
             //OJO* Seguridad: aquí en el futuro puedes validar que los device_ids

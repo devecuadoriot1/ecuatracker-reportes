@@ -13,6 +13,8 @@ class Vehiculo extends Model
 
     protected $fillable = [
         'device_id',
+        'codigo',
+        'imei',
         'nombre_api',
         'marca',
         'clase',
@@ -26,6 +28,8 @@ class Vehiculo extends Model
     ];
 
     protected $casts = [
-        'anio' => 'integer',
+        'device_id' => 'integer',
+        'codigo'    => 'integer',
+        'anio'      => 'integer',
     ];
 }
