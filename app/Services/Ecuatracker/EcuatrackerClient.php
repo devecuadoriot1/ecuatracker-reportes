@@ -46,10 +46,31 @@ class EcuatrackerClient
     public function getDevices(): array
     {
         $resp = $this->get('/get_devices', ['lang' => 'en']);
+        $items = is_array($resp['items'] ?? null) ? $resp['items'] : (is_array($resp) ? $resp : []);
 
-        return is_array($resp['items'] ?? null)
-            ? $resp['items']
-            : (is_array($resp) ? $resp : []);
+        return $this->flattenDevices($items);
+    }
+
+    /**
+     * @param array<int, mixed> $items
+     * @return array<int, mixed>
+     */
+    protected function flattenDevices(array $items): array
+    {
+        $result = [];
+        foreach ($items as $item) {
+            if (isset($item['items']) && is_array($item['items'])) {
+                foreach ($item['items'] as $child) {
+                    if (is_array($child)) {
+                        $child['group_id'] = $item['id'] ?? null;
+                        $result[] = $child;
+                    }
+                }
+            } elseif (is_array($item)) {
+                $result[] = $item;
+            }
+        }
+        return $result;
     }
 
     /**

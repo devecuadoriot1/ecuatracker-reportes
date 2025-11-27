@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Log;
 class AnalisisRecorridoService
 {
     protected readonly bool $debug;
+    protected int $chunkSize = 100; // Límite de devices por petición para evitar URLs enormes
 
     public function __construct(
         protected readonly EcuatrackerClient $ecuatrackerClient,
@@ -87,8 +88,8 @@ class AnalisisRecorridoService
 
             $resultado[] = [
                 'device_id'          => $deviceId,
-                'codigo'             => $deviceId,
-                'nombre_api'         => $nombreApi,
+                'codigo'             => $extra?->codigo,
+                'nombre_api'         => $nombreApi ?? $extra?->nombre_api,
                 'marca'              => $extra?->marca,
                 'clase'              => $extra?->clase,
                 'modelo'             => $extra?->modelo,
@@ -128,7 +129,7 @@ class AnalisisRecorridoService
             ]);
         }
 
-        $response = $this->ecuatrackerClient->generateKmReport(
+        $response = $this->generateKmReportChunked(
             $deviceIds,
             $desde->toDateString(),
             $hasta->toDateString(),
@@ -163,8 +164,8 @@ class AnalisisRecorridoService
 
             $resultado[] = [
                 'device_id'          => $deviceId,
-                'codigo'             => $deviceId,
-                'nombre_api'         => $nombreApi,
+                'codigo'             => $extra?->codigo,
+                'nombre_api'         => $nombreApi ?? $extra?->nombre_api,
                 'marca'              => $extra?->marca,
                 'clase'              => $extra?->clase,
                 'modelo'             => $extra?->modelo,
@@ -299,7 +300,7 @@ class AnalisisRecorridoService
                 ]);
             }
 
-            $responseSemana = $this->ecuatrackerClient->generateKmReport(
+            $responseSemana = $this->generateKmReportChunked(
                 $deviceIds,
                 $desdeSemanaDate,
                 $hastaSemanaDate,
@@ -340,6 +341,36 @@ class AnalisisRecorridoService
     }
 
     /**
+     * Llama generate_report en chunks y combina los items.
+     *
+     * @param array<int,int> $deviceIds
+     * @param array<string,mixed> $options
+     * @return array<string,mixed>
+     */
+    protected function generateKmReportChunked(array $deviceIds, string $desde, string $hasta, array $options = []): array
+    {
+        $mergedItems = [];
+        $chunkIndex  = 1;
+
+        foreach (\array_chunk($deviceIds, $this->chunkSize) as $chunk) {
+            $opts = $options;
+            if (isset($opts['title'])) {
+                $opts['title'] = $opts['title'] . " (parte {$chunkIndex})";
+            }
+
+            $response = $this->ecuatrackerClient->generateKmReport($chunk, $desde, $hasta, $opts);
+
+            if (isset($response['items']) && \is_array($response['items'])) {
+                $mergedItems = \array_merge($mergedItems, $response['items']);
+            }
+
+            $chunkIndex++;
+        }
+
+        return ['items' => $mergedItems];
+    }
+
+    /**
      * @param array<string,mixed> $response
      * @param array<int,int>      $deviceIds
      * @return array<int,array{km_total:float,nombre_api:?string}>
@@ -359,24 +390,113 @@ class AnalisisRecorridoService
             ]);
         }
 
-        foreach ($deviceIds as $idx => $deviceId) {
-            if (!isset($items[$idx]) || !\is_array($items[$idx])) {
+        // Conjunto de ids solicitados, para filtrar
+        $deviceIdsSet = \array_flip($deviceIds);
+
+        // Pre-cargamos vehículos para estos deviceIds (id -> nombre_api)
+        $vehiculos = Vehiculo::whereIn('device_id', $deviceIds)
+            ->get(['device_id', 'nombre_api']);
+
+        $mapNombreToDeviceId = [];
+        foreach ($vehiculos as $vehiculo) {
+            if ($vehiculo->nombre_api) {
+                $mapNombreToDeviceId[$vehiculo->nombre_api] = (int) $vehiculo->device_id;
+            }
+        }
+
+        foreach ($items as $item) {
+            if (!\is_array($item)) {
                 continue;
             }
 
-            $item = $items[$idx];
+            $meta   = $item['meta']   ?? [];
+            $totals = $item['totals'] ?? [];
 
-            $metaDevice = $item['meta']['device.name'] ?? null;
-            $nombreApi  = \is_array($metaDevice) ? ($metaDevice['value'] ?? null) : null;
+            // 1) Intentar obtener el device_id directo (por si algún reporte lo trae)
+            $deviceIdRaw = null;
+            $candidatosId = [
+                $meta['device.id']   ?? null,
+                $meta['device_id']   ?? null,
+                $item['device_id']   ?? null,
+                $item['id']          ?? null,
+            ];
 
-            $distanceStr = $item['totals']['distance']['value'] ?? '0';
-            $numericStr  = preg_replace('/[^0-9\.\-]/', '', (string) $distanceStr);
+            foreach ($candidatosId as $c) {
+                if ($c === null) {
+                    continue;
+                }
+
+                if (\is_array($c)) {
+                    $c = $c['value'] ?? null;
+                }
+
+                if ($c !== null && $c !== '' && \is_numeric($c)) {
+                    $deviceIdRaw = (int) $c;
+                    break;
+                }
+            }
+
+            // 2) Nombre del dispositivo (device.name)
+            $nombreApi = null;
+            if (isset($meta['device.name'])) {
+                $nameMeta = $meta['device.name'];
+                $nombreApi = \is_array($nameMeta) ? ($nameMeta['value'] ?? null) : $nameMeta;
+            } elseif (isset($item['name'])) {
+                $nombreApi = $item['name'];
+            }
+
+            // 3) Distancia (totals.distance.value)
+            $distanceCandidate = null;
+
+            if (isset($totals['distance']) && \is_array($totals['distance'])) {
+                if (isset($totals['distance']['value'])) {
+                    $distanceCandidate = $totals['distance']['value'];
+                } else {
+                    $distanceCandidate = \reset($totals['distance']);
+                }
+            } elseif (isset($totals['distance'])) {
+                $distanceCandidate = $totals['distance'];
+            } elseif (isset($item['distance'])) {
+                $distanceCandidate = $item['distance'];
+            } elseif (isset($item['total_distance'])) {
+                $distanceCandidate = $item['total_distance'];
+            }
+
+            $distanceStr = (string) ($distanceCandidate ?? '0');
+            $numericStr  = \preg_replace('/[^0-9\.\-]/', '', $distanceStr);
             $distanceKm  = (float) ($numericStr ?: 0);
 
-            $resultado[$deviceId] = [
-                'km_total'   => $distanceKm,
-                'nombre_api' => $nombreApi,
-            ];
+            // 4) Si no pudimos obtener device_id directo, intentamos mapear por nombre_api
+            if ($deviceIdRaw === null && $nombreApi !== null) {
+                if (isset($mapNombreToDeviceId[$nombreApi])) {
+                    $deviceIdRaw = $mapNombreToDeviceId[$nombreApi];
+                }
+            }
+
+            // 5) Guardar sólo si el device_id está dentro de los solicitados
+            if ($deviceIdRaw !== null && isset($deviceIdsSet[$deviceIdRaw])) {
+                $resultado[$deviceIdRaw] = [
+                    'km_total'   => $distanceKm,
+                    'nombre_api' => $nombreApi,
+                ];
+            } elseif ($this->debug) {
+                Log::warning('[AnalisisRecorrido] Item de reporte no se pudo mapear a device_id solicitado', [
+                    'device_id_raw'  => $deviceIdRaw,
+                    'nombre_api'     => $nombreApi,
+                    'distance_raw'   => $distanceCandidate,
+                    'distance_km'    => $distanceKm,
+                    'meta_keys'      => \array_keys($meta),
+                    'totals_keys'    => \array_keys($totals),
+                ]);
+            }
+        }
+
+        if ($this->debug) {
+            $faltantes = \array_diff($deviceIds, \array_keys($resultado));
+            Log::info('[AnalisisRecorrido] extractKmPorDispositivo resumen', [
+                'mapeados'  => \count($resultado),
+                'faltantes' => $faltantes,
+            ]);
         }
 
         return $resultado;
