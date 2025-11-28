@@ -13,25 +13,42 @@ use Illuminate\Support\Facades\Log;
 class VehiculoController extends Controller
 {
     /**
-     * Lista de vehículos (con búsqueda opcional).
+     * Lista de vehículos (con búsqueda y paginación opcionales).
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Vehiculo::query();
+        // Búsqueda simple por query param ?search=
+        $search = (string) $request->query('search', '');
+        $search = trim($search);
 
-        if ($search = $request->string('search')->trim()) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nombre_api', 'like', '%' . $search . '%')
-                    ->orWhere('placas', 'like', '%' . $search . '%')
-                    ->orWhere('marca', 'like', '%' . $search . '%')
-                    ->orWhere('modelo', 'like', '%' . $search . '%');
-            });
+        // Paginación: ?per_page=50 (0 => sin paginar)
+        $perPage = $request->integer('per_page', 50);
+        if ($perPage < 0) {
+            $perPage = 50;
         }
 
-        // Puedes paginar si quieres:
-        $vehiculos = $query->orderBy('nombre_api')->get();
+        $query = Vehiculo::query()
+            ->ordered()
+            ->search($search);
 
-        return response()->json(VehiculoResource::collection($vehiculos));
+        // Si per_page = 0 => sin paginar (para selects grandes, etc.)
+        if ($perPage === 0) {
+            $vehiculos = $query->get();
+
+            return response()->json(
+                VehiculoResource::collection($vehiculos)
+            );
+        }
+
+        // Límite razonable para no matar el servidor
+        $perPage = min($perPage, 200);
+
+        $vehiculos = $query->paginate($perPage);
+
+        // Laravel envuelve con meta de paginación automáticamente
+        return response()->json(
+            VehiculoResource::collection($vehiculos)
+        );
     }
 
     /**

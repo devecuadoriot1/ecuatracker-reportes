@@ -18,6 +18,8 @@ class VehiculoResource extends JsonResource
         return [
             'id'                => $this->id,
             'device_id'         => $this->device_id,
+            'codigo'            => $this->codigo,
+            'imei'              => $this->imei,
             'nombre_api'        => $this->nombre_api,
             'marca'             => $this->marca,
             'clase'             => $this->clase,
@@ -29,9 +31,9 @@ class VehiculoResource extends JsonResource
             'responsable'       => $this->responsable,
             'gerencia_asignada' => $this->gerencia_asignada,
 
-            //FRONT* ÚTIL PARA EL FRONT: label listo para un <select>
+            // Útil para el FRONT: label listo para un <select>
             'label'             => $this->nombre_api
-                ?? trim($this->placas . ' ' . $this->marca . ' ' . $this->modelo),
+                ?? trim(($this->placas ?? '') . ' ' . ($this->marca ?? '') . ' ' . ($this->modelo ?? '')),
 
             // valor "recomendado" para selects (id interno, no el device_id)
             'value'             => $this->id,
