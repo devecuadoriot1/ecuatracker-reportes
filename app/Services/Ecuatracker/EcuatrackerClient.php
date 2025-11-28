@@ -143,6 +143,30 @@ class EcuatrackerClient
     protected function fetchGeneratedReport(string $url): array
     {
         try {
+            // Normalizar URL relativa a absoluta
+            if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+                $url = rtrim($this->baseUrl, '/') . '/' . ltrim($url, '/');
+            }
+
+            // Validar host destino contra baseUrl (seguridad básica)
+            $baseHost   = parse_url($this->baseUrl, PHP_URL_HOST);
+            $targetHost = parse_url($url, PHP_URL_HOST);
+
+            if ($baseHost && $targetHost && !hash_equals($baseHost, $targetHost)) {
+                Log::warning('[EcuatrackerClient] Host de URL de reporte no coincide con base_url', [
+                    'base_url'    => $this->baseUrl,
+                    'url'         => $url,
+                    'base_host'   => $baseHost,
+                    'target_host' => $targetHost,
+                ]);
+
+                throw new ApiException(
+                    'URL del reporte generado no es válida.',
+                    0,
+                    ['url' => $url]
+                );
+            }
+
             if ($this->debug) {
                 Log::info('[EcuatrackerClient] GET reporte generado', ['url' => $url]);
             }

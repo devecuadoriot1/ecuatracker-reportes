@@ -5,8 +5,9 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithTitle;
 
-class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldAutoSize
+class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle
 {
     /**
      * @var array<int, array<string,mixed>>
@@ -21,12 +22,20 @@ class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldA
         $this->data = $data;
     }
 
+    /**
+     * Título de la pestaña de la hoja de Excel.
+     */
+    public function title(): string
+    {
+        return 'Análisis de Recorrido de Kilometraje';
+    }
+
     public function headings(): array
     {
         return [
             'Device ID',
             'Código',
-            'Nombre API',
+            'Dispositivo',
             'Marca',
             'Clase',
             'Modelo',
@@ -64,11 +73,11 @@ class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldA
                 $item['responsable']       ?? null,
                 $item['gerencia_asignada'] ?? null,
                 $item['mes_label']         ?? null,
-                $item['km_total_mes']       ?? null,
-                $item['param_mes_total']    ?? null,
-                $item['km_promedio_mes']    ?? null,
+                $item['km_total_mes']      ?? null,
+                $item['param_mes_total']   ?? null,
+                $item['km_promedio_mes']   ?? null,
                 $item['param_mes_promedio'] ?? null,
-                $item['conclusion_mes']     ?? null,
+                $item['conclusion_mes']    ?? null,
             ];
         }
 

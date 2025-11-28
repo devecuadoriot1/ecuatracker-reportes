@@ -21,14 +21,25 @@ class ParametrizacionKmService
      */
     public function clasificar(string $tipo, float $km): ?string
     {
+        // Normalizar km a 2 decimales y evitar negativos
+        $kmNormalizado = \round($km, 2);
+        if ($kmNormalizado < 0.0) {
+            $kmNormalizado = 0.0;
+        }
+
         $rangos = $this->getRangosPorTipo($tipo);
 
         /** @var ParametrizacionKm|null $match */
-        $match = $rangos->first(function (ParametrizacionKm $rango) use ($km): bool {
-            return $km >= $rango->km_min && $km <= $rango->km_max;
+        $match = $rangos->first(function (ParametrizacionKm $rango) use ($kmNormalizado): bool {
+            return $kmNormalizado >= (float) $rango->km_min && $kmNormalizado <= (float) $rango->km_max;
         });
 
-        return $match?->nombre;
+        if ($match !== null) {
+            return $match->nombre;
+        }
+
+        // Si no hay coincidencia en ningún rango configurado
+        return 'SIN PARAMETRIZAR';
     }
 
     protected function getRangosPorTipo(string $tipo): Collection
