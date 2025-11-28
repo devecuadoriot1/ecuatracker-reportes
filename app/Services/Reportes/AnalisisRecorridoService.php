@@ -29,6 +29,10 @@ class AnalisisRecorridoService
      */
     public function generar(array $deviceIds, Carbon $desde, Carbon $hasta, string $titulo): array
     {
+        if ($deviceIds === []) {
+            return [];
+        }
+
         if ($this->debug) {
             Log::info('[AnalisisRecorrido] (SEMANAL) Iniciando generación', [
                 'device_ids' => $deviceIds,
@@ -40,19 +44,24 @@ class AnalisisRecorridoService
 
         $semanas = $this->dividirEnSemanas($desde, $hasta);
 
+        // Cargar vehículos una sola vez (menos queries)
+        $vehiculosIndex = $this->buildVehiculosIndex($deviceIds);
+
         $kmSemanalPorDispositivo = $this->obtenerKmSemanalPorDispositivo(
             $deviceIds,
             $semanas,
             $titulo,
             $desde,
-            $hasta
+            $hasta,
+            $vehiculosIndex['mapNombreToDeviceId']
         );
 
-        $vehiculosExtras = $this->cargarVehiculosExtras($deviceIds);
+        /** @var array<int,Vehiculo> $vehiculosExtras */
+        $vehiculosExtras = $vehiculosIndex['porDeviceId'];
 
         $resultado   = [];
         $numSemanas  = \count($semanas) ?: 1;
-        $mesLabel    = mb_strtoupper($desde->translatedFormat('F'), 'UTF-8');
+        $mesLabel = mb_strtoupper($desde->locale('es')->translatedFormat('F'), 'UTF-8');
 
         foreach ($deviceIds as $deviceId) {
             $info      = $kmSemanalPorDispositivo[$deviceId] ?? ['nombre_api' => null, 'semanas' => []];
@@ -65,6 +74,9 @@ class AnalisisRecorridoService
             $paramMesTotal = $this->parametrizacionKmService->clasificar('mes_total', $kmTotalMes);
             $paramMesProm  = $this->parametrizacionKmService->clasificar('mes_prom', $kmPromedio);
             $conclusionMes = $paramMesProm;
+
+            /** @var Vehiculo|null $extra */
+            $extra = $vehiculosExtras[$deviceId] ?? null;
 
             $filasSemanas   = [];
             $contadorSemana = 1;
@@ -83,8 +95,6 @@ class AnalisisRecorridoService
 
                 $contadorSemana++;
             }
-
-            $extra = $vehiculosExtras[$deviceId] ?? null;
 
             $resultado[] = [
                 'device_id'          => $deviceId,
@@ -120,6 +130,10 @@ class AnalisisRecorridoService
      */
     public function generarMensual(array $deviceIds, Carbon $desde, Carbon $hasta, string $titulo): array
     {
+        if ($deviceIds === []) {
+            return [];
+        }
+
         if ($this->debug) {
             Log::info('[AnalisisRecorrido] (MENSUAL) Iniciando generación', [
                 'device_ids' => $deviceIds,
@@ -128,6 +142,9 @@ class AnalisisRecorridoService
                 'titulo'     => $titulo,
             ]);
         }
+
+        // Cargar vehículos una sola vez
+        $vehiculosIndex = $this->buildVehiculosIndex($deviceIds);
 
         $response = $this->generateKmReportChunked(
             $deviceIds,
@@ -140,12 +157,18 @@ class AnalisisRecorridoService
             ]
         );
 
-        $kmPorDispositivo = $this->extractKmPorDispositivo($response, $deviceIds);
+        $kmPorDispositivo = $this->extractKmPorDispositivo(
+            $response,
+            $deviceIds,
+            $vehiculosIndex['mapNombreToDeviceId']
+        );
 
         $semanas    = $this->dividirEnSemanas($desde, $hasta);
         $numSemanas = \count($semanas) ?: 1;
-        $vehiculosExtras = $this->cargarVehiculosExtras($deviceIds);
-        $mesLabel  = mb_strtoupper($desde->translatedFormat('F'), 'UTF-8');
+
+        /** @var array<int,Vehiculo> $vehiculosExtras */
+        $vehiculosExtras = $vehiculosIndex['porDeviceId'];
+        $mesLabel = mb_strtoupper($desde->locale('es')->translatedFormat('F'), 'UTF-8');
 
         $resultado = [];
 
@@ -160,6 +183,7 @@ class AnalisisRecorridoService
             $paramMesProm  = $this->parametrizacionKmService->clasificar('mes_prom', $kmPromedio);
             $conclusionMes = $paramMesProm;
 
+            /** @var Vehiculo|null $extra */
             $extra = $vehiculosExtras[$deviceId] ?? null;
 
             $resultado[] = [
@@ -188,66 +212,156 @@ class AnalisisRecorridoService
     }
 
     /**
+     * Construye índices de Vehiculo para evitar múltiples queries.
+     *
+     * @param array<int,int> $deviceIds
+     * @return array{
+     *     porDeviceId: array<int,Vehiculo>,
+     *     mapNombreToDeviceId: array<string,int>
+     * }
+     */
+    protected function buildVehiculosIndex(array $deviceIds): array
+    {
+        $vehiculos = Vehiculo::whereIn('device_id', $deviceIds)->get();
+
+        /** @var array<int,Vehiculo> $porDeviceId */
+        $porDeviceId = $vehiculos->keyBy('device_id')->all();
+
+        $mapNombreToDeviceId = [];
+        foreach ($vehiculos as $vehiculo) {
+            if ($vehiculo->nombre_api) {
+                $mapNombreToDeviceId[$vehiculo->nombre_api] = (int) $vehiculo->device_id;
+            }
+        }
+
+        return [
+            'porDeviceId'         => $porDeviceId,
+            'mapNombreToDeviceId' => $mapNombreToDeviceId,
+        ];
+    }
+
+    /**
+     * Divide el rango en semanas lógicas:
+     * - Hasta 7 días  -> 1 semana
+     * - Hasta 14 días -> 2 semanas
+     * - Hasta 21 días -> 3 semanas
+     * - Más de 21 días (p.ej. meses de 29,30,31 días) -> 4 semanas:
+     *   * Semanas 1,2,3 de 7 días (siempre que alcance)
+     *   * Semana 4 con todos los días restantes
+     *
      * @return array<int,array{desde:Carbon,hasta:Carbon}>
      */
     protected function dividirEnSemanas(Carbon $desde, Carbon $hasta): array
     {
         $semanas   = [];
+
         $inicioMes = $desde->copy()->startOfDay();
         $finMes    = $hasta->copy()->endOfDay();
 
+        if ($inicioMes->gt($finMes)) {
+            return $semanas;
+        }
+
         $dias = (int) ($inicioMes->diffInDays($finMes) + 1);
 
-        if ($dias <= 28) {
-            if ($dias <= 7) {
-                $numSemanas = 1;
-            } elseif ($dias <= 14) {
-                $numSemanas = 2;
-            } elseif ($dias <= 21) {
-                $numSemanas = 3;
-            } else {
-                $numSemanas = 4;
-            }
+        // 1 semana
+        if ($dias <= 7) {
+            $semanas[] = ['desde' => $inicioMes, 'hasta' => $finMes];
+            return $semanas;
+        }
 
+        // 2 semanas: primera de hasta 7 días, segunda el resto
+        if ($dias <= 14) {
             $inicio = $inicioMes->copy();
 
-            for ($i = 0; $i < $numSemanas; $i++) {
-                $fin = $inicio->copy()->addDays(6)->endOfDay();
-                if ($fin->gt($finMes) || $i === $numSemanas - 1) {
-                    $fin = $finMes->copy();
-                }
+            $finSemana1 = $inicio->copy()->addDays(6)->endOfDay();
+            if ($finSemana1->gt($finMes)) {
+                $finSemana1 = $finMes->copy();
+            }
 
-                $semanas[] = ['desde' => $inicio, 'hasta' => $fin];
+            $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana1];
 
-                $inicio = $fin->copy()->addDay()->startOfDay();
-                if ($inicio->gt($finMes)) {
-                    break;
-                }
+            $inicioSemana2 = $finSemana1->copy()->addDay()->startOfDay();
+            if ($inicioSemana2->lte($finMes)) {
+                $semanas[] = ['desde' => $inicioSemana2, 'hasta' => $finMes];
             }
 
             return $semanas;
         }
 
-        $numSemanas = 4;
-        $baseLength = intdiv($dias, $numSemanas);
-        $resto      = $dias % $numSemanas;
+        // 3 semanas: dos primeras de hasta 7 días, la tercera con el resto
+        if ($dias <= 21) {
+            $inicio = $inicioMes->copy();
 
+            // Semana 1
+            $finSemana1 = $inicio->copy()->addDays(6)->endOfDay();
+            if ($finSemana1->gt($finMes)) {
+                $finSemana1 = $finMes->copy();
+            }
+            $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana1];
+
+            // Semana 2
+            $inicio = $finSemana1->copy()->addDay()->startOfDay();
+            if ($inicio->gt($finMes)) {
+                return $semanas;
+            }
+
+            $finSemana2 = $inicio->copy()->addDays(6)->endOfDay();
+            if ($finSemana2->gt($finMes)) {
+                $finSemana2 = $finMes->copy();
+            }
+            $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana2];
+
+            // Semana 3: todo lo que queda
+            $inicio = $finSemana2->copy()->addDay()->startOfDay();
+            if ($inicio->lte($finMes)) {
+                $semanas[] = ['desde' => $inicio, 'hasta' => $finMes];
+            }
+
+            return $semanas;
+        }
+
+        // Más de 21 días:
+        // Siempre 4 semanas máximo
+        // Semanas 1,2,3 de 7 días (si hay días suficientes)
+        // Semana 4 con el resto (incluye días 29,30,31, etc.)
         $inicio = $inicioMes->copy();
 
-        for ($i = 0; $i < $numSemanas; $i++) {
-            $longitudSemana = $baseLength + ($i < $resto ? 1 : 0);
+        // Semana 1
+        $finSemana1 = $inicio->copy()->addDays(6)->endOfDay();
+        if ($finSemana1->gt($finMes)) {
+            $finSemana1 = $finMes->copy();
+        }
+        $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana1];
 
-            $fin = $inicio->copy()->addDays($longitudSemana - 1)->endOfDay();
-            if ($fin->gt($finMes)) {
-                $fin = $finMes->copy();
-            }
+        // Semana 2
+        $inicio = $finSemana1->copy()->addDay()->startOfDay();
+        if ($inicio->gt($finMes)) {
+            return $semanas;
+        }
 
-            $semanas[] = ['desde' => $inicio, 'hasta' => $fin];
+        $finSemana2 = $inicio->copy()->addDays(6)->endOfDay();
+        if ($finSemana2->gt($finMes)) {
+            $finSemana2 = $finMes->copy();
+        }
+        $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana2];
 
-            $inicio = $fin->copy()->addDay()->startOfDay();
-            if ($inicio->gt($finMes)) {
-                break;
-            }
+        // Semana 3
+        $inicio = $finSemana2->copy()->addDay()->startOfDay();
+        if ($inicio->gt($finMes)) {
+            return $semanas;
+        }
+
+        $finSemana3 = $inicio->copy()->addDays(6)->endOfDay();
+        if ($finSemana3->gt($finMes)) {
+            $finSemana3 = $finMes->copy();
+        }
+        $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana3];
+
+        // Semana 4: todo lo que reste hasta finMes
+        $inicio = $finSemana3->copy()->addDay()->startOfDay();
+        if ($inicio->lte($finMes)) {
+            $semanas[] = ['desde' => $inicio, 'hasta' => $finMes];
         }
 
         return $semanas;
@@ -256,6 +370,7 @@ class AnalisisRecorridoService
     /**
      * @param array<int,int> $deviceIds
      * @param array<int,array{desde:Carbon,hasta:Carbon}> $semanas
+     * @param array<string,int> $mapNombreToDeviceId
      * @return array<int,array{nombre_api:?string,semanas:array<int,float>}>
      */
     protected function obtenerKmSemanalPorDispositivo(
@@ -263,7 +378,8 @@ class AnalisisRecorridoService
         array $semanas,
         string $titulo,
         Carbon $desdeOriginal,
-        Carbon $hastaOriginal
+        Carbon $hastaOriginal,
+        array $mapNombreToDeviceId
     ): array {
         $resultado = [];
 
@@ -311,7 +427,11 @@ class AnalisisRecorridoService
                 ]
             );
 
-            $kmSemanaPorDispositivo = $this->extractKmPorDispositivo($responseSemana, $deviceIds);
+            $kmSemanaPorDispositivo = $this->extractKmPorDispositivo(
+                $responseSemana,
+                $deviceIds,
+                $mapNombreToDeviceId
+            );
 
             foreach ($deviceIds as $deviceId) {
                 $infoSemana = $kmSemanaPorDispositivo[$deviceId] ?? null;
@@ -349,6 +469,10 @@ class AnalisisRecorridoService
      */
     protected function generateKmReportChunked(array $deviceIds, string $desde, string $hasta, array $options = []): array
     {
+        if ($deviceIds === []) {
+            return ['items' => []];
+        }
+
         $mergedItems = [];
         $chunkIndex  = 1;
 
@@ -373,9 +497,10 @@ class AnalisisRecorridoService
     /**
      * @param array<string,mixed> $response
      * @param array<int,int>      $deviceIds
+     * @param array<string,int>   $mapNombreToDeviceId
      * @return array<int,array{km_total:float,nombre_api:?string}>
      */
-    protected function extractKmPorDispositivo(array $response, array $deviceIds): array
+    protected function extractKmPorDispositivo(array $response, array $deviceIds, array $mapNombreToDeviceId): array
     {
         $resultado = [];
 
@@ -393,17 +518,6 @@ class AnalisisRecorridoService
         // Conjunto de ids solicitados, para filtrar
         $deviceIdsSet = \array_flip($deviceIds);
 
-        // Pre-cargamos vehículos para estos deviceIds (id -> nombre_api)
-        $vehiculos = Vehiculo::whereIn('device_id', $deviceIds)
-            ->get(['device_id', 'nombre_api']);
-
-        $mapNombreToDeviceId = [];
-        foreach ($vehiculos as $vehiculo) {
-            if ($vehiculo->nombre_api) {
-                $mapNombreToDeviceId[$vehiculo->nombre_api] = (int) $vehiculo->device_id;
-            }
-        }
-
         foreach ($items as $item) {
             if (!\is_array($item)) {
                 continue;
@@ -412,13 +526,20 @@ class AnalisisRecorridoService
             $meta   = $item['meta']   ?? [];
             $totals = $item['totals'] ?? [];
 
+            if (!\is_array($meta)) {
+                $meta = [];
+            }
+            if (!\is_array($totals)) {
+                $totals = [];
+            }
+
             // 1) Intentar obtener el device_id directo (por si algún reporte lo trae)
-            $deviceIdRaw = null;
-            $candidatosId = [
-                $meta['device.id']   ?? null,
-                $meta['device_id']   ?? null,
-                $item['device_id']   ?? null,
-                $item['id']          ?? null,
+            $deviceIdRaw   = null;
+            $candidatosId  = [
+                $meta['device.id'] ?? null,
+                $meta['device_id'] ?? null,
+                $item['device_id'] ?? null,
+                $item['id']        ?? null,
             ];
 
             foreach ($candidatosId as $c) {
@@ -439,7 +560,7 @@ class AnalisisRecorridoService
             // 2) Nombre del dispositivo (device.name)
             $nombreApi = null;
             if (isset($meta['device.name'])) {
-                $nameMeta = $meta['device.name'];
+                $nameMeta  = $meta['device.name'];
                 $nombreApi = \is_array($nameMeta) ? ($nameMeta['value'] ?? null) : $nameMeta;
             } elseif (isset($item['name'])) {
                 $nombreApi = $item['name'];
@@ -467,26 +588,25 @@ class AnalisisRecorridoService
             $distanceKm  = (float) ($numericStr ?: 0);
 
             // 4) Si no pudimos obtener device_id directo, intentamos mapear por nombre_api
-            if ($deviceIdRaw === null && $nombreApi !== null) {
-                if (isset($mapNombreToDeviceId[$nombreApi])) {
-                    $deviceIdRaw = $mapNombreToDeviceId[$nombreApi];
-                }
+            if ($deviceIdRaw === null && $nombreApi !== null && isset($mapNombreToDeviceId[$nombreApi])) {
+                $deviceIdRaw = $mapNombreToDeviceId[$nombreApi];
             }
 
             // 5) Guardar sólo si el device_id está dentro de los solicitados
             if ($deviceIdRaw !== null && isset($deviceIdsSet[$deviceIdRaw])) {
+                // Importante: aquí NO acumulamos, usamos un solo valor por device
                 $resultado[$deviceIdRaw] = [
                     'km_total'   => $distanceKm,
                     'nombre_api' => $nombreApi,
                 ];
             } elseif ($this->debug) {
                 Log::warning('[AnalisisRecorrido] Item de reporte no se pudo mapear a device_id solicitado', [
-                    'device_id_raw'  => $deviceIdRaw,
-                    'nombre_api'     => $nombreApi,
-                    'distance_raw'   => $distanceCandidate,
-                    'distance_km'    => $distanceKm,
-                    'meta_keys'      => \array_keys($meta),
-                    'totals_keys'    => \array_keys($totals),
+                    'device_id_raw' => $deviceIdRaw,
+                    'nombre_api'    => $nombreApi,
+                    'distance_raw'  => $distanceCandidate,
+                    'distance_km'   => $distanceKm,
+                    'meta_keys'     => \array_keys($meta),
+                    'totals_keys'   => \array_keys($totals),
                 ]);
             }
         }

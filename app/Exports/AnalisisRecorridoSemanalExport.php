@@ -5,8 +5,9 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithTitle;
 
-class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldAutoSize
+class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle
 {
     /**
      * @var array<int, array<string,mixed>>
@@ -21,11 +22,20 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
         $this->data = $data;
     }
 
+    /**
+     * Título de la pestaña de la hoja de Excel.
+     */
+    public function title(): string
+    {
+        return 'Análisis de Recorrido de Kilometraje';
+    }
+
     public function headings(): array
     {
         return [
             'Nro.',
             'CODIGO',
+            'DISPOSITIVO',
             'MARCA',
             'CLASE',
             'MODELO',
@@ -61,7 +71,6 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
         ];
     }
 
-
     public function array(): array
     {
         $rows = [];
@@ -86,6 +95,7 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
             $rows[] = [
                 $nro,
                 $item['codigo']            ?? $item['device_id'] ?? null,
+                $item['nombre_api']        ?? null, // DISPOSITIVO
                 $item['marca']             ?? null,
                 $item['clase']             ?? null,
                 $item['modelo']            ?? null,
@@ -111,6 +121,7 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
 
             $nro++;
         }
+
         return $rows;
     }
 }
