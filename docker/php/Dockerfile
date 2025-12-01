@@ -1,6 +1,6 @@
 FROM php:8.3-fpm
 
-# Instalar extensiones necesarias para Laravel
+# Instalar extensiones necesarias para Laravel + Filament (intl)
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    && docker-php-ext-install pdo_mysql zip gd mbstring
+    libicu-dev \
+    && docker-php-ext-install pdo_mysql zip gd mbstring intl
 
 # Instalar Composer dentro de la imagen
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
