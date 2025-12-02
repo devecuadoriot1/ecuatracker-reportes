@@ -5,7 +5,11 @@ namespace App\Filament\Resources\Vehiculos\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\DeleteAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use App\Models\Vehiculo;
+use Filament\Tables;
 use Filament\Tables\Table;
 
 class VehiculosTable
@@ -13,55 +17,58 @@ class VehiculosTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->query(Vehiculo::query()) // Aquí luego puedes enganchar tus scopes
             ->columns([
-                TextColumn::make('device_id')
-                    ->numeric()
-                    ->sortable(),
                 TextColumn::make('codigo')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('imei')
+                    ->label('Código')
+                    ->sortable()
                     ->searchable(),
+
                 TextColumn::make('nombre_api')
+                    ->label('Dispositivo')
+                    ->sortable()
                     ->searchable(),
-                TextColumn::make('marca')
-                    ->searchable(),
-                TextColumn::make('clase')
-                    ->searchable(),
-                TextColumn::make('modelo')
-                    ->searchable(),
-                TextColumn::make('tipo')
-                    ->searchable(),
-                TextColumn::make('anio')
-                    ->numeric()
-                    ->sortable(),
+
                 TextColumn::make('placas')
+                    ->sortable()
                     ->searchable(),
+
+                TextColumn::make('marca')
+                    ->toggleable(),
+
+                TextColumn::make('modelo')
+                    ->toggleable(),
+
+                TextColumn::make('tipo')
+                    ->toggleable(),
+
+                TextColumn::make('anio')
+                    ->label('Año')
+                    ->sortable()
+                    ->toggleable(),
+
                 TextColumn::make('area_asignada')
-                    ->searchable(),
+                    ->label('Área')
+                    ->toggleable(),
+
                 TextColumn::make('responsable')
-                    ->searchable(),
+                    ->toggleable(),
+
                 TextColumn::make('gerencia_asignada')
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->label('Gerencia')
+                    ->toggleable(),
             ])
             ->filters([
-                //
+                Filter::make('sin_placas')
+                    ->label('Sin placas')
+                    ->query(fn($query) => $query->whereNull('placas')),
             ])
-            ->recordActions([
+            ->actions([
                 EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+            ->bulkActions([
+                DeleteBulkAction::make(),
             ]);
     }
 }
