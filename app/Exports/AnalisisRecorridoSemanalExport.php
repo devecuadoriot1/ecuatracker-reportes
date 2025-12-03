@@ -2,34 +2,8 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithTitle;
-
-class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle
+class AnalisisRecorridoSemanalExport extends BaseAnalisisRecorridoExport
 {
-    /**
-     * @var array<int, array<string,mixed>>
-     */
-    protected array $data;
-
-    /**
-     * @param array<int, array<string,mixed>> $data
-     */
-    public function __construct(array $data)
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * Título de la pestaña de la hoja de Excel.
-     */
-    public function title(): string
-    {
-        return 'Análisis de Recorrido de Kilometraje';
-    }
-
     public function headings(): array
     {
         return [
@@ -48,23 +22,23 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
             'MES',
             // Semana 1
             'SEMANA',
-            'KILOMETRAJE RECORRIDO (Km)',
+            'KILOMETRAJE RECORRIDO',
             'PARAMETRIZACIÓN',
             // Semana 2
             'SEMANA',
-            'KILOMETRAJE RECORRIDO (Km)',
+            'KILOMETRAJE RECORRIDO',
             'PARAMETRIZACIÓN',
             // Semana 3
             'SEMANA',
-            'KILOMETRAJE RECORRIDO (Km)',
+            'KILOMETRAJE RECORRIDO',
             'PARAMETRIZACIÓN',
             // Semana 4
             'SEMANA',
-            'KILOMETRAJE RECORRIDO (Km)',
+            'KILOMETRAJE RECORRIDO',
             'PARAMETRIZACIÓN',
             // Resumen mes
             'MES',
-            'KILOMETRAJE RECORRIDO (Km)',
+            'KILOMETRAJE RECORRIDO',
             'PARAMETRIZACIÓN',
             'PROMEDIO MES',
             'CONCLUSION MES',
@@ -95,7 +69,7 @@ class AnalisisRecorridoSemanalExport implements FromArray, WithHeadings, ShouldA
             $rows[] = [
                 $nro,
                 $item['codigo']            ?? $item['device_id'] ?? null,
-                $item['nombre_api']        ?? null, // DISPOSITIVO
+                $item['nombre_api']        ?? null,
                 $item['marca']             ?? null,
                 $item['clase']             ?? null,
                 $item['modelo']            ?? null,

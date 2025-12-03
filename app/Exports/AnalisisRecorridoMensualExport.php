@@ -2,34 +2,9 @@
 
 namespace App\Exports;
 
-use Maatwebsite\Excel\Concerns\FromArray;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithTitle;
 
-class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldAutoSize, WithTitle
+class AnalisisRecorridoMensualExport extends BaseAnalisisRecorridoExport
 {
-    /**
-     * @var array<int, array<string,mixed>>
-     */
-    protected array $data;
-
-    /**
-     * @param array<int, array<string,mixed>> $data
-     */
-    public function __construct(array $data)
-    {
-        $this->data = $data;
-    }
-
-    /**
-     * Título de la pestaña de la hoja de Excel.
-     */
-    public function title(): string
-    {
-        return 'Análisis de Recorrido de Kilometraje';
-    }
-
     public function headings(): array
     {
         return [
@@ -45,11 +20,11 @@ class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldA
             'Área asignada',
             'Responsable',
             'Gerencia asignada',
-            'Mes (label)',
+            'Mes',
             'Km total mes',
             'Param. km total mes',
             'Km promedio mes',
-            'Param. km promedio mes',
+            //OJO'Param. km promedio mes',
             'Conclusión mes',
         ];
     }
@@ -76,7 +51,7 @@ class AnalisisRecorridoMensualExport implements FromArray, WithHeadings, ShouldA
                 $item['km_total_mes']      ?? null,
                 $item['param_mes_total']   ?? null,
                 $item['km_promedio_mes']   ?? null,
-                $item['param_mes_promedio'] ?? null,
+                //OJO $item['param_mes_promedio'] ?? null,
                 $item['conclusion_mes']    ?? null,
             ];
         }
