@@ -20,7 +20,7 @@ class VehiculosTable
             ->query(Vehiculo::query()) // Aquí luego puedes enganchar tus scopes
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('Código')
+                    ->label('Codigo')
                     ->sortable()
                     ->searchable(),
 
@@ -43,12 +43,12 @@ class VehiculosTable
                     ->toggleable(),
 
                 TextColumn::make('anio')
-                    ->label('Año')
+                    ->label('Ano')
                     ->sortable()
                     ->toggleable(),
 
                 TextColumn::make('area_asignada')
-                    ->label('Área')
+                    ->label('Area')
                     ->toggleable(),
 
                 TextColumn::make('responsable')

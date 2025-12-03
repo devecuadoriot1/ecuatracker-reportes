@@ -25,7 +25,7 @@ class VehiculoForm
                             ),
 
                         TextInput::make('codigo')
-                            ->label('Código interno')
+                            ->label('Codigo interno')
                             ->numeric()
                             ->nullable(),
 
@@ -51,7 +51,7 @@ class VehiculoForm
                     ])
                     ->columns(2),
 
-                Section::make('Características del vehículo')
+                Section::make('Caracteristicas del vehiculo')
                     ->schema([
                         TextInput::make('marca')
                             ->maxLength(255)
@@ -70,7 +70,7 @@ class VehiculoForm
                             ->nullable(),
 
                         TextInput::make('anio')
-                            ->label('Año')
+                            ->label('Ano')
                             ->numeric()
                             ->minValue(1900)
                             ->maxValue(now()->year + 1)
@@ -78,10 +78,10 @@ class VehiculoForm
                     ])
                     ->columns(3),
 
-                Section::make('Asignación')
+                Section::make('Asignacion')
                     ->schema([
                         TextInput::make('area_asignada')
-                            ->label('Área asignada')
+                            ->label('Area asignada')
                             ->maxLength(255)
                             ->nullable(),
 

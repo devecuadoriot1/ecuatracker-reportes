@@ -12,3 +12,5 @@ Route::get('reportes/analisis-recorrido', [ReporteAnalisisRecorridoController::c
 
 Route::post('reportes/analisis-recorrido', [ReporteAnalisisRecorridoController::class, 'store'])
     ->name('reportes.analisis_recorrido.store');
+Route::get('/reportes/analisis-recorrido/descargar', [ReporteAnalisisRecorridoController::class, 'download'])
+    ->name('reportes.analisis-recorrido.download');
