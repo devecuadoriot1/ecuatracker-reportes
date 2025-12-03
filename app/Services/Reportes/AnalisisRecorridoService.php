@@ -312,7 +312,7 @@ class AnalisisRecorridoService
             }
             $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana2];
 
-            // Semana 3: todo lo que queda
+            /* Semana 3 */
             $inicio = $finSemana2->copy()->addDay()->startOfDay();
             if ($inicio->lte($finMes)) {
                 $semanas[] = ['desde' => $inicio, 'hasta' => $finMes];
@@ -324,7 +324,7 @@ class AnalisisRecorridoService
         // Más de 21 días:
         // Siempre 4 semanas máximo
         // Semanas 1,2,3 de 7 días (si hay días suficientes)
-        // Semana 4 con el resto (incluye días 29,30,31, etc.)
+        // Semana 4 con el resto (incluye días 29,30,31)
         $inicio = $inicioMes->copy();
 
         // Semana 1
@@ -358,7 +358,7 @@ class AnalisisRecorridoService
         }
         $semanas[] = ['desde' => $inicio, 'hasta' => $finSemana3];
 
-        // Semana 4: todo lo que reste hasta finMes
+        /*Semana 4 y lo que reste hasta finMes*/
         $inicio = $finSemana3->copy()->addDay()->startOfDay();
         if ($inicio->lte($finMes)) {
             $semanas[] = ['desde' => $inicio, 'hasta' => $finMes];
@@ -448,18 +448,6 @@ class AnalisisRecorridoService
 
         return $resultado;
     }
-
-    /**
-     * @param array<int,int> $deviceIds
-     * @return array<int,Vehiculo>
-     */
-    protected function cargarVehiculosExtras(array $deviceIds): array
-    {
-        $vehiculos = Vehiculo::whereIn('device_id', $deviceIds)->get();
-
-        return $vehiculos->keyBy('device_id')->all();
-    }
-
     /**
      * Llama generate_report en chunks y combina los items.
      *

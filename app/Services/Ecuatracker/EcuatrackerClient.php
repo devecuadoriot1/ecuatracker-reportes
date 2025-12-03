@@ -45,7 +45,7 @@ class EcuatrackerClient
      */
     public function getDevices(): array
     {
-        $resp = $this->get('/get_devices', ['lang' => 'en']);
+        $resp  = $this->get('/get_devices', ['lang' => 'en']);
         $items = is_array($resp['items'] ?? null) ? $resp['items'] : (is_array($resp) ? $resp : []);
 
         return $this->flattenDevices($items);
@@ -58,18 +58,20 @@ class EcuatrackerClient
     protected function flattenDevices(array $items): array
     {
         $result = [];
+
         foreach ($items as $item) {
             if (isset($item['items']) && is_array($item['items'])) {
                 foreach ($item['items'] as $child) {
                     if (is_array($child)) {
                         $child['group_id'] = $item['id'] ?? null;
-                        $result[] = $child;
+                        $result[]          = $child;
                     }
                 }
             } elseif (is_array($item)) {
                 $result[] = $item;
             }
         }
+
         return $result;
     }
 
@@ -90,9 +92,9 @@ class EcuatrackerClient
     /**
      * Genera reporte de km recorridos.
      *
-     * @param array<int,int> $deviceIds
-     * @param string         $dateFrom Y-m-d
-     * @param string         $dateTo   Y-m-d
+     * @param array<int,int>      $deviceIds
+     * @param string              $dateFrom Y-m-d
+     * @param string              $dateTo   Y-m-d
      * @param array<string,mixed> $options
      *
      * @return array<string,mixed>
@@ -144,7 +146,7 @@ class EcuatrackerClient
     {
         try {
             // Normalizar URL relativa a absoluta
-            if (!str_starts_with($url, 'http://') && !str_starts_with($url, 'https://')) {
+            if (! str_starts_with($url, 'http://') && ! str_starts_with($url, 'https://')) {
                 $url = rtrim($this->baseUrl, '/') . '/' . ltrim($url, '/');
             }
 
@@ -152,10 +154,10 @@ class EcuatrackerClient
             $baseHost   = parse_url($this->baseUrl, PHP_URL_HOST);
             $targetHost = parse_url($url, PHP_URL_HOST);
 
-            if ($baseHost && $targetHost && !hash_equals($baseHost, $targetHost)) {
+            if ($baseHost && $targetHost && ! hash_equals((string) $baseHost, (string) $targetHost)) {
                 Log::warning('[EcuatrackerClient] Host de URL de reporte no coincide con base_url', [
                     'base_url'    => $this->baseUrl,
-                    'url'         => $url,
+                    'url'         => $this->maskUrl($url),
                     'base_host'   => $baseHost,
                     'target_host' => $targetHost,
                 ]);
@@ -168,7 +170,9 @@ class EcuatrackerClient
             }
 
             if ($this->debug) {
-                Log::info('[EcuatrackerClient] GET reporte generado', ['url' => $url]);
+                Log::info('[EcuatrackerClient] GET reporte generado', [
+                    'url' => $this->maskUrl($url),
+                ]);
             }
 
             $response = Http::timeout($this->timeout)
@@ -184,7 +188,7 @@ class EcuatrackerClient
             return is_array($json) ? $json : [];
         } catch (\Throwable $e) {
             Log::error('Error obteniendo reporte generado de Ecuatracker', [
-                'url'   => $url,
+                'url'   => $this->maskUrl($url),
                 'error' => $e->getMessage(),
             ]);
 
@@ -198,7 +202,7 @@ class EcuatrackerClient
     }
 
     /**
-     * @param array<string,mixed> $params
+     * @param  array<string,mixed>  $params
      * @return array<string,mixed>
      */
     protected function get(string $path, array $params = []): array
@@ -212,8 +216,8 @@ class EcuatrackerClient
         try {
             if ($this->debug) {
                 Log::info('[EcuatrackerClient] GET', [
-                    'url'   => $url,
-                    'query' => $query,
+                    'url'   => $this->maskUrl($url),
+                    'query' => $this->maskArray($query),
                 ]);
             }
 
@@ -222,7 +226,7 @@ class EcuatrackerClient
                 ->get($url, $query);
 
             if ($response->failed()) {
-                $this->logAndThrow('GET', $path, $query, $response->status(), $response->body());
+                $this->logAndThrow('GET', $path, $this->maskArray($query), $response->status(), $response->body());
             }
 
             $json = $response->json();
@@ -231,21 +235,21 @@ class EcuatrackerClient
         } catch (\Throwable $e) {
             Log::error('Error llamando a Ecuatracker GET', [
                 'path'  => $path,
-                'query' => $query,
+                'query' => $this->maskArray($query),
                 'error' => $e->getMessage(),
             ]);
 
             throw new ApiException(
                 'Error de comunicación con Ecuatracker (GET)',
                 0,
-                ['path' => $path, 'query' => $query],
+                ['path' => $path, 'query' => $this->maskArray($query)],
                 $e
             );
         }
     }
 
     /**
-     * @param array<string,mixed> $payload
+     * @param  array<string,mixed>  $payload
      * @return array<string,mixed>
      */
     protected function post(string $path, array $payload = []): array
@@ -259,9 +263,9 @@ class EcuatrackerClient
 
         if ($this->debug) {
             Log::info('[EcuatrackerClient] POST', [
-                'url'        => $url,
-                'query'      => $query,
-                //OJO*  si el payload tuviera datos sensibles, aquí habría que ocultarlos
+                'url'        => $this->maskUrl($url),
+                'query'      => $this->maskArray($query),
+                // útil para verificar rápidamente qué hash se está usando, sin exponerlo completo
                 'hash_start' => substr($this->userApiHash, 0, 8) . '***',
             ]);
         }
@@ -277,7 +281,7 @@ class EcuatrackerClient
                 $this->logAndThrow(
                     'POST',
                     $path,
-                    ['query' => $query],
+                    ['query' => $this->maskArray($query)],
                     $response->status(),
                     $response->body()
                 );
@@ -289,28 +293,30 @@ class EcuatrackerClient
         } catch (\Throwable $e) {
             Log::error('Error llamando a Ecuatracker POST', [
                 'path'  => $path,
-                'query' => $query,
+                'query' => $this->maskArray($query),
                 'error' => $e->getMessage(),
             ]);
 
             throw new ApiException(
                 'Error de comunicación con Ecuatracker (POST)',
                 0,
-                ['path' => $path, 'query' => $query],
+                ['path' => $path, 'query' => $this->maskArray($query)],
                 $e
             );
         }
     }
 
     /**
-     * @param array<string,mixed> $requestData
+     * @param  array<string,mixed>  $requestData
      */
     protected function logAndThrow(string $method, string $path, array $requestData, int $status, string $body): void
     {
+        $safeRequest = $this->maskArray($requestData);
+
         Log::error('Respuesta no exitosa de Ecuatracker', [
             'method'  => $method,
             'path'    => $path,
-            'request' => $requestData,
+            'request' => $safeRequest,
             'status'  => $status,
             'body'    => mb_substr($body, 0, 1000), // límite para no llenar logs
         ]);
@@ -319,9 +325,44 @@ class EcuatrackerClient
             "Error en Ecuatracker ({$method} {$path}) [HTTP {$status}]",
             $status,
             [
-                'request' => $requestData,
+                'request' => $safeRequest,
                 'body'    => $body,
             ]
         );
+    }
+
+    /**
+     * Enmascara el valor de user_api_hash en URLs tipo ?user_api_hash=...
+     */
+    private function maskUrl(string $url): string
+    {
+        $masked = \preg_replace('/(user_api_hash=)[^&]+/i', '$1[HIDDEN]', $url);
+
+        return $masked ?? $url;
+    }
+
+    /**
+     * Enmascara valores sensibles dentro de arrays de request/query.
+     *
+     * - Cualquier clave que contenga "hash" (case-insensitive) se reemplaza por [HIDDEN].
+     * - Se aplica recursivamente.
+     *
+     * @param  array<string,mixed>  $data
+     * @return array<string,mixed>
+     */
+    private function maskArray(array $data): array
+    {
+        foreach ($data as $key => $value) {
+            if (\is_array($value)) {
+                $data[$key] = $this->maskArray($value);
+                continue;
+            }
+
+            if (\is_string($value) && \stripos((string) $key, 'hash') !== false) {
+                $data[$key] = '[HIDDEN]';
+            }
+        }
+
+        return $data;
     }
 }

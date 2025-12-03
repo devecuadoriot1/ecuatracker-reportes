@@ -78,7 +78,6 @@ class ReporteAnalisisRecorridoController extends Controller
      */
     private function generateReportResponse(array $data, bool $fromPostRequest): Response
     {
-        // ---------------- Fechas y horas ----------------
         try {
             $horaDesde = $data['hora_desde'] ?? '00:00';
             $horaHasta = $data['hora_hasta'] ?? '23:59';
@@ -252,8 +251,6 @@ class ReporteAnalisisRecorridoController extends Controller
 
             return $pdf->download($fileName);
         }
-
-        // ---------------- Formato no soportado (fallback JSON) ----------------
         return new JsonResponse([
             'success' => false,
             'message' => 'Formato de salida no soportado.',
