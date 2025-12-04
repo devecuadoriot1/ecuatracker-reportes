@@ -61,10 +61,14 @@ class EcuatrackerClient
 
         foreach ($items as $item) {
             if (isset($item['items']) && is_array($item['items'])) {
+                $groupId    = $item['id']    ?? null;
+                $groupTitle = $item['title'] ?? null;
+
                 foreach ($item['items'] as $child) {
                     if (is_array($child)) {
-                        $child['group_id'] = $item['id'] ?? null;
-                        $result[]          = $child;
+                        $child['group_id']    = $groupId;
+                        $child['group_title'] = $groupTitle;
+                        $result[] = $child;
                     }
                 }
             } elseif (is_array($item)) {

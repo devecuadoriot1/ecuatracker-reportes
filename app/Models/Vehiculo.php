@@ -15,6 +15,8 @@ class Vehiculo extends Model
     protected $fillable = [
         'device_id',
         'codigo',
+        'group_id',
+        'group_title',
         'imei',
         'nombre_api',
         'marca',
@@ -31,6 +33,7 @@ class Vehiculo extends Model
     protected $casts = [
         'device_id' => 'integer',
         'codigo'    => 'integer',
+        'group_id'  => 'integer',
         'anio'      => 'integer',
     ];
 
@@ -68,5 +71,29 @@ class Vehiculo extends Model
         return $query
             ->orderBy('nombre_api')
             ->orderBy('placas');
+    }
+
+    public function getSelectLabelAttribute(): string
+    {
+        $parts = [];
+
+        if ($this->nombre_api) {
+            $parts[] = $this->nombre_api;
+        }
+
+        if ($this->placas) {
+            $parts[] = 'Placa: ' . $this->placas;
+        }
+
+        $marcaModelo = trim(($this->marca ?? '') . ' ' . ($this->modelo ?? ''));
+        if ($marcaModelo !== '') {
+            $parts[] = $marcaModelo;
+        }
+
+        if ($this->area_asignada) {
+            $parts[] = 'Área: ' . $this->area_asignada;
+        }
+
+        return $parts ? implode(' · ', $parts) : 'Vehículo #' . $this->id;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Models\Vehiculo;
+use App\Filament\Forms\Components\VehiculosSelector;
 use App\Services\Reportes\AnalisisRecorridoService; // lo puedes dejar por si luego haces previews
 use Filament\Actions\Action as FormAction;
 use Filament\Schemas\Components\Utilities\Set;
@@ -87,41 +88,11 @@ class AnalisisRecorrido extends Page
                     ])
                     ->required(),
 
-                Forms\Components\Select::make('vehiculo_ids')
+                VehiculosSelector::make('vehiculo_ids')
                     ->label('Vehículos')
-                    ->multiple()
                     ->required()
-                    ->options(function () {
-                        return Vehiculo::ordered()
-                            ->get()
-                            ->mapWithKeys(function (Vehiculo $vehiculo): array {
-                                $parts = [];
-
-                                if ($vehiculo->nombre_api) {
-                                    $parts[] = $vehiculo->nombre_api;
-                                }
-
-                                $label = $parts ? implode(' · ', $parts) : 'Vehículo #' . $vehiculo->id;
-
-                                return [$vehiculo->id => $label];
-                            })
-                            ->toArray();
-                    })
-                    ->searchable()
-                    ->preload()
-                    ->suffixAction(
-                        FormAction::make('select_all_vehicles')
-                            ->icon('heroicon-m-check-circle')
-                            ->tooltip('Seleccionar todos los vehículos')
-                            ->action(function (Set $set) {
-                                // Obtenemos todos los IDs de vehículos una sola vez
-                                $ids = Vehiculo::ordered()->pluck('id')->all();
-
-                                // Seteamos el estado del campo con TODOS los IDs
-                                $set('vehiculo_ids', $ids);
-                            })
-                    ),
-
+                    // puedes ajustar cuántos grupos por página quieres
+                    ->groupsPerPage(2),
             ])
             ->statePath('data');
     }

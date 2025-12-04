@@ -1,8 +1,11 @@
 <x-filament-panels::page>
     <form wire:submit="submit">
         {{ $this->form }}
-        <x-filament::button type="submit" class="mt-4">
-            Generar reporte
-        </x-filament::button>
+
+        <div class="mt-6">
+            <x-filament::button type="submit">
+                Generar reporte
+            </x-filament::button>
+        </div>
     </form>
 </x-filament-panels::page>

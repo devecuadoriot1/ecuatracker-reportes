@@ -11,6 +11,8 @@ return new class extends Migration {
             $table->id();
             $table->unsignedBigInteger('device_id')->unique();
             $table->unsignedBigInteger('codigo')->nullable();
+            $table->unsignedBigInteger('group_id')->nullable();
+            $table->string('group_title')->nullable();
             $table->string('imei', 50)->nullable();
             $table->string('nombre_api')->nullable();
             $table->string('marca', 100)->nullable();

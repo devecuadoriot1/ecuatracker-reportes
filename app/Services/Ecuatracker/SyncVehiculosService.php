@@ -28,10 +28,10 @@ class SyncVehiculosService
         $updated = 0;
 
         foreach ($devices as $device) {
-            // Estructura tipica GPSWOX/Ecuatracker
-            $deviceId = $device['id'] ?? $device['device_id'] ?? null;
+            // Estructura típica GPSWOX/Ecuatracker
+            $deviceId    = $device['id'] ?? $device['device_id'] ?? null;
             $name        = $device['name'] ?? $device['device_name'] ?? null;
-            $imei        = $device['imei'] ?? $device['device_imei'] ?? null;
+            $imei        = $this->extractImei($device);
             $plateNumber = $this->extractPlateNumber($device);
 
             if ($deviceId === null || $name === null) {
@@ -43,6 +43,11 @@ class SyncVehiculosService
 
             $deviceId = (int) $deviceId;
             $codigo   = $this->extractCodigoFromName($name);
+
+            // NUEVO: extraer info de grupo
+            $groupInfo = $this->extractGroupInfo($device);
+            $groupId    = $groupInfo['group_id'];
+            $groupTitle = $groupInfo['group_title'];
 
             $vehiculo = Vehiculo::where('device_id', $deviceId)->first();
 
@@ -58,7 +63,11 @@ class SyncVehiculosService
                     $vehiculo->placas = $plateNumber;
                 }
 
-                if (!$dryRun) {
+                // grupo siempre viene de la API, no es campo “manual”
+                $vehiculo->group_id    = $groupId;
+                $vehiculo->group_title = $groupTitle;
+
+                if (! $dryRun) {
                     $vehiculo->save();
                 }
 
@@ -66,7 +75,7 @@ class SyncVehiculosService
                 continue;
             }
 
-            // Actualizar solo campos provenientes de la API (no tocamos marca/clase/etc.)
+            // Actualizar solo campos provenientes de la API
             $dirty = false;
 
             if ($vehiculo->nombre_api !== $name) {
@@ -84,13 +93,23 @@ class SyncVehiculosService
                 $dirty = true;
             }
 
-            // Actualizar placas si vienen en la API y cambiaron
             if ($plateNumber && $vehiculo->placas !== $plateNumber) {
                 $vehiculo->placas = $plateNumber;
                 $dirty = true;
             }
 
-            if ($dirty && !$dryRun) {
+            // grupo (siempre viene de la API, se puede pisar seguro)
+            if ($vehiculo->group_id !== $groupId) {
+                $vehiculo->group_id = $groupId;
+                $dirty = true;
+            }
+
+            if ($vehiculo->group_title !== $groupTitle) {
+                $vehiculo->group_title = $groupTitle;
+                $dirty = true;
+            }
+
+            if ($dirty && ! $dryRun) {
                 $vehiculo->save();
                 $updated++;
             }
@@ -105,6 +124,30 @@ class SyncVehiculosService
             'created' => $created,
             'updated' => $updated,
         ];
+    }
+
+
+    /**
+     * Obtiene el IMEI desde las llaves habituales de la API.
+     *
+     * @param  array<string,mixed>  $device
+     */
+    protected function extractImei(array $device): ?string
+    {
+        // Prioridad: top-level
+        $imei = $device['imei'] ?? $device['device_imei'] ?? null;
+
+        // Fallback: dentro de device_data (según algunos esquemas de Ecuatracker/GPSWOX)
+        if (! $imei && isset($device['device_data']) && is_array($device['device_data'])) {
+            $imei = $device['device_data']['imei'] ?? $device['device_data']['device_imei'] ?? null;
+        }
+
+        // Fallback extra: algunos proveedores usan uniqueid como IMEI
+        if (! $imei) {
+            $imei = $device['uniqueid'] ?? $device['unique_id'] ?? null;
+        }
+
+        return is_string($imei) && $imei !== '' ? $imei : null;
     }
 
     /**
@@ -141,5 +184,32 @@ class SyncVehiculosService
         }
 
         return is_string($plate) && $plate !== '' ? $plate : null;
+    }
+    /**
+     * Obtiene group_id y group_title desde la estructura del dispositivo.
+     *
+     * @param  array<string,mixed>  $device
+     * @return array{group_id:?int,group_title:?string}
+     */
+    protected function extractGroupInfo(array $device): array
+    {
+        // Primero intentamos con las llaves que ya ponemos en flattenDevices()
+        $groupId    = $device['group_id']    ?? null;
+        $groupTitle = $device['group_title'] ?? null;
+
+        // Fallback: por si algún día el JSON cambia y sólo viene en device_data
+        $deviceData = $device['device_data'] ?? [];
+        if ($groupId === null && is_array($deviceData) && isset($deviceData['group_id'])) {
+            $groupId = $deviceData['group_id'];
+        }
+
+        // Normalizamos tipos
+        $groupId = is_numeric($groupId) ? (int) $groupId : null;
+        $groupTitle = is_string($groupTitle) && $groupTitle !== '' ? $groupTitle : null;
+
+        return [
+            'group_id'    => $groupId,
+            'group_title' => $groupTitle,
+        ];
     }
 }
