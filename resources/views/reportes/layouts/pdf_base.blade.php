@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: DejaVu Sans, sans-serif;
-            font-size: 11px;
+            font-size: 8px;
         }
 
         h1,
@@ -20,6 +20,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            table-layout: fixed;
         }
 
         th,
@@ -38,6 +39,12 @@
 
         .text-right {
             text-align: right;
+        }
+
+        table.compact th,
+        table.compact td {
+            padding: 2px;
+            word-wrap: break-word;
         }
     </style>
 </head>

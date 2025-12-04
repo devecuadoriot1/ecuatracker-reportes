@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Facades\Cache;
 
 class ReporteAnalisisRecorridoController extends Controller
 {
@@ -56,20 +57,33 @@ class ReporteAnalisisRecorridoController extends Controller
      */
     public function download(Request $request): Response
     {
-        // Normalizamos los parámetros de query a la estructura esperada.
-        $data = [
-            'titulo'       => (string) $request->query('titulo', ''),
-            'modo'         => (string) $request->query('modo', 'semanal'),
-            'formato'      => (string) $request->query('formato', 'excel'),
-            'fecha_desde'  => (string) $request->query('fecha_desde', ''),
-            'fecha_hasta'  => (string) $request->query('fecha_hasta', ''),
-            'hora_desde'   => (string) $request->query('hora_desde', '00:00'),
-            'hora_hasta'   => (string) $request->query('hora_hasta', '23:59'),
-            'vehiculo_ids' => (array) $request->query('vehiculo_ids', []),
-        ];
+        // Si viene un token (llamado desde Filament), usamos los datos cacheados
+        if ($token = $request->query('token')) {
+            $cached = Cache::pull("analisis_recorrido:{$token}");
+
+            if (! is_array($cached)) {
+                abort(410, 'El enlace de descarga ha expirado o no es válido.');
+            }
+
+            // $cached ya está en el formato que espera generateReportResponse()
+            $data = $cached;
+        } else {
+            // Modo “clásico”: leer parámetros desde la query (para compatibilidad)
+            $data = [
+                'titulo'       => (string) $request->query('titulo', ''),
+                'modo'         => (string) $request->query('modo', 'semanal'),
+                'formato'      => (string) $request->query('formato', 'excel'),
+                'fecha_desde'  => (string) $request->query('fecha_desde', ''),
+                'fecha_hasta'  => (string) $request->query('fecha_hasta', ''),
+                'hora_desde'   => (string) $request->query('hora_desde', '00:00'),
+                'hora_hasta'   => (string) $request->query('hora_hasta', '23:59'),
+                'vehiculo_ids' => (array) $request->query('vehiculo_ids', []),
+            ];
+        }
 
         return $this->generateReportResponse($data, false);
     }
+
 
     /**
      * Lógica común para generar y devolver el reporte.

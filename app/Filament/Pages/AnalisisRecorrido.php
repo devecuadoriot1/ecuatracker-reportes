@@ -6,6 +6,8 @@ namespace App\Filament\Pages;
 
 use App\Models\Vehiculo;
 use App\Services\Reportes\AnalisisRecorridoService; // lo puedes dejar por si luego haces previews
+use Filament\Actions\Action as FormAction;
+use Filament\Schemas\Components\Utilities\Set;
 use BackedEnum;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -13,7 +15,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 class AnalisisRecorrido extends Page
@@ -32,8 +36,11 @@ class AnalisisRecorrido extends Page
     public function mount(): void
     {
         $this->form->fill([
-            'modo'    => 'semanal',
-            'formato' => 'excel',
+            'titulo'     => 'Análisis de recorrido',
+            'modo'       => 'semanal',
+            'formato'    => 'excel',
+            'hora_desde' => '00:00',
+            'hora_hasta' => '23:59',
         ]);
     }
 
@@ -49,8 +56,8 @@ class AnalisisRecorrido extends Page
                 Forms\Components\Select::make('modo')
                     ->label('Modo')
                     ->options([
-                        'semanal' => 'Semanal + resumen mensual',
-                        'mensual' => 'Mensual (solo totales)',
+                        'semanal' => 'Semanal',
+                        'mensual' => 'Mensual',
                     ])
                     ->required(),
 
@@ -84,8 +91,8 @@ class AnalisisRecorrido extends Page
                     ->label('Vehículos')
                     ->multiple()
                     ->required()
-                    ->options(
-                        Vehiculo::ordered()
+                    ->options(function () {
+                        return Vehiculo::ordered()
                             ->get()
                             ->mapWithKeys(function (Vehiculo $vehiculo): array {
                                 $parts = [];
@@ -94,27 +101,27 @@ class AnalisisRecorrido extends Page
                                     $parts[] = $vehiculo->nombre_api;
                                 }
 
-                                if ($vehiculo->placas) {
-                                    $parts[] = 'Placa: ' . $vehiculo->placas;
-                                }
-
-                                $marcaModelo = trim(($vehiculo->marca ?? '') . ' ' . ($vehiculo->modelo ?? ''));
-
-                                if ($marcaModelo !== '') {
-                                    $parts[] = $marcaModelo;
-                                }
-
-                                if ($vehiculo->area_asignada) {
-                                    $parts[] = 'Área: ' . $vehiculo->area_asignada;
-                                }
-
                                 $label = $parts ? implode(' · ', $parts) : 'Vehículo #' . $vehiculo->id;
 
                                 return [$vehiculo->id => $label];
                             })
-                    )
+                            ->toArray();
+                    })
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->suffixAction(
+                        FormAction::make('select_all_vehicles')
+                            ->icon('heroicon-m-check-circle')
+                            ->tooltip('Seleccionar todos los vehículos')
+                            ->action(function (Set $set) {
+                                // Obtenemos todos los IDs de vehículos una sola vez
+                                $ids = Vehiculo::ordered()->pluck('id')->all();
+
+                                // Seteamos el estado del campo con TODOS los IDs
+                                $set('vehiculo_ids', $ids);
+                            })
+                    ),
+
             ])
             ->statePath('data');
     }
@@ -128,9 +135,16 @@ class AnalisisRecorrido extends Page
         $data = $this->form->getState();
 
         try {
-            $query = $this->buildDownloadQuery($data);
+            // Normalizamos el payload al formato que espera el controlador
+            $payload = $this->buildReportPayload($data);
 
-            $url = route('reportes.analisis-recorrido.download', $query);
+            // Generamos un token único y guardamos los datos en cache (10 minutos)
+            $token = (string) Str::uuid();
+
+            Cache::put("analisis_recorrido:{$token}", $payload, now()->addMinutes(10));
+
+            // Construimos una URL corta con solo el token
+            $url = route('reportes.analisis-recorrido.download', ['token' => $token]);
 
             // Livewire v3: navigate:false para abrir la descarga sin cambiar de página
             $this->redirect($url, navigate: false);
@@ -155,18 +169,42 @@ class AnalisisRecorrido extends Page
     }
 
     /**
-     * Normaliza los datos del formulario al formato esperado por el controlador.
+     * Normaliza el estado del formulario Filament al formato que
+     * espera el controlador (titulo, modo, formato, fecha_*, hora_*, vehiculo_ids).
      *
      * @param  array<string,mixed>  $data
      * @return array<string,mixed>
      */
-    private function buildDownloadQuery(array $data): array
+    private function buildReportPayload(array $data): array
     {
-        $fechaDesde = Carbon::parse($data['desde'])->format('Y-m-d');
-        $fechaHasta = Carbon::parse($data['hasta'])->format('Y-m-d');
+        $desde = $data['desde'] ?? null;
+        $hasta = $data['hasta'] ?? null;
 
-        $horaDesde = $data['hora_desde'] ?? '00:00';
-        $horaHasta = $data['hora_hasta'] ?? '23:59';
+        $fechaDesde = '';
+        $fechaHasta = '';
+
+        if ($desde instanceof Carbon) {
+            $fechaDesde = $desde->toDateString();
+        } elseif (is_string($desde) && $desde !== '') {
+            $fechaDesde = Carbon::parse($desde)->toDateString();
+        }
+
+        if ($hasta instanceof Carbon) {
+            $fechaHasta = $hasta->toDateString();
+        } elseif (is_string($hasta) && $hasta !== '') {
+            $fechaHasta = Carbon::parse($hasta)->toDateString();
+        }
+
+        $horaDesde = $data['hora_desde'] ?? null;
+        $horaHasta = $data['hora_hasta'] ?? null;
+
+        $horaDesdeStr = $horaDesde instanceof Carbon
+            ? $horaDesde->format('H:i')
+            : ((string) ($horaDesde ?: '00:00'));
+
+        $horaHastaStr = $horaHasta instanceof Carbon
+            ? $horaHasta->format('H:i')
+            : ((string) ($horaHasta ?: '23:59'));
 
         return [
             'titulo'       => (string) ($data['titulo'] ?? ''),
@@ -174,8 +212,8 @@ class AnalisisRecorrido extends Page
             'formato'      => (string) ($data['formato'] ?? 'excel'),
             'fecha_desde'  => $fechaDesde,
             'fecha_hasta'  => $fechaHasta,
-            'hora_desde'   => $horaDesde,
-            'hora_hasta'   => $horaHasta,
+            'hora_desde'   => $horaDesdeStr,
+            'hora_hasta'   => $horaHastaStr,
             'vehiculo_ids' => array_map('intval', $data['vehiculo_ids'] ?? []),
         ];
     }

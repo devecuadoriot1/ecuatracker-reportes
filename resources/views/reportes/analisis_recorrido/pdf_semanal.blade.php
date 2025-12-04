@@ -10,7 +10,7 @@
     Modo: SEMANAL + RESUMEN MENSUAL
 </p>
 
-<table>
+<table class="compact">
     <thead>
         <tr>
             <th>#</th>
@@ -25,6 +25,7 @@
             <th>ÁREA</th>
             <th>RESPONSABLE</th>
             <th>GERENCIA</th>
+            {{-- Semanas --}}
             <th>SEM 1 (Km)</th>
             <th>PARAM SEM 1</th>
             <th>SEM 2 (Km)</th>
@@ -41,6 +42,10 @@
     </thead>
     <tbody>
         @foreach ($resultado as $index => $item)
+        @php
+        $semanas = $item['semanas'] ?? [];
+        @endphp
+
         <tr>
             <td class="text-center">{{ $index + 1 }}</td>
             <td class="text-center">{{ $item['codigo'] ?? '' }}</td>
@@ -55,19 +60,25 @@
             <td>{{ $item['responsable'] ?? '' }}</td>
             <td>{{ $item['gerencia_asignada'] ?? '' }}</td>
 
-            {{-- Ajusta estos índices a la estructura real que devuelva tu servicio/export --}}
-            <td class="text-right">{{ $item['semanas'][0]['km'] ?? '' }}</td>
-            <td>{{ $item['semanas'][0]['param'] ?? '' }}</td>
-            <td class="text-right">{{ $item['semanas'][1]['km'] ?? '' }}</td>
-            <td>{{ $item['semanas'][1]['param'] ?? '' }}</td>
-            <td class="text-right">{{ $item['semanas'][2]['km'] ?? '' }}</td>
-            <td>{{ $item['semanas'][2]['param'] ?? '' }}</td>
-            <td class="text-right">{{ $item['semanas'][3]['km'] ?? '' }}</td>
-            <td>{{ $item['semanas'][3]['param'] ?? '' }}</td>
+            {{-- SEMANA 1 --}}
+            <td class="text-right">{{ $semanas[0]['km'] ?? '' }}</td>
+            <td>{{ $semanas[0]['parametrizacion'] ?? '' }}</td>
 
-            <td class="text-right">{{ $item['total_mes_km'] ?? '' }}</td>
-            <td>{{ $item['param_total_mes'] ?? '' }}</td>
-            <td class="text-right">{{ $item['promedio_mes_km'] ?? '' }}</td>
+            {{-- SEMANA 2 --}}
+            <td class="text-right">{{ $semanas[1]['km'] ?? '' }}</td>
+            <td>{{ $semanas[1]['parametrizacion'] ?? '' }}</td>
+
+            {{-- SEMANA 3 --}}
+            <td class="text-right">{{ $semanas[2]['km'] ?? '' }}</td>
+            <td>{{ $semanas[2]['parametrizacion'] ?? '' }}</td>
+
+            {{-- SEMANA 4 --}}
+            <td class="text-right">{{ $semanas[3]['km'] ?? '' }}</td>
+            <td>{{ $semanas[3]['parametrizacion'] ?? '' }}</td>
+
+            <td class="text-right">{{ $item['km_total_mes'] ?? '' }}</td>
+            <td>{{ $item['param_mes_total'] ?? '' }}</td>
+            <td class="text-right">{{ $item['km_promedio_mes'] ?? '' }}</td>
             <td>{{ $item['conclusion_mes'] ?? '' }}</td>
         </tr>
         @endforeach
