@@ -10,7 +10,7 @@ class ParametrizacionesKmSeeder extends Seeder
     public function run(): void
     {
         // Limpia solo estos tipos (opcional)
-        ParametrizacionKm::whereIn('tipo', ['semana', 'mes_total', 'mes_prom'])->delete();
+        ParametrizacionKm::whereIn('tipo', ['semana', 'mes_total'])->delete();
 
         $rows = [
             // SEMANAL
@@ -22,11 +22,6 @@ class ParametrizacionesKmSeeder extends Seeder
             ['tipo' => 'mes_total', 'nombre' => 'POCO USO',  'km_min' => 0.00,    'km_max' => 1500.00, 'orden' => 1],
             ['tipo' => 'mes_total', 'nombre' => 'MEDIO USO', 'km_min' => 1500.01, 'km_max' => 3500.00, 'orden' => 2],
             ['tipo' => 'mes_total', 'nombre' => 'ALTO USO',  'km_min' => 3500.01, 'km_max' => 5500.00, 'orden' => 3],
-
-            // MENSUAL - PROMEDIO
-            ['tipo' => 'mes_prom', 'nombre' => 'POCO USO',  'km_min' => 0.00,    'km_max' => 1500.00, 'orden' => 1],
-            ['tipo' => 'mes_prom', 'nombre' => 'MEDIO USO', 'km_min' => 1500.01, 'km_max' => 3500.00, 'orden' => 2],
-            ['tipo' => 'mes_prom', 'nombre' => 'ALTO USO',  'km_min' => 3500.01, 'km_max' => 5500.00, 'orden' => 3],
         ];
 
         ParametrizacionKm::insert($rows);

@@ -25,9 +25,11 @@ class SyncVehiculosFromEcuatracker extends Command
         $result = $syncVehiculosService->sync($dryRun);
 
         $this->info(sprintf(
-            'Sincronización finalizada. Creados: %d, Actualizados: %d',
-            $result['created'],
-            $result['updated']
+            'Sincronización finalizada. Total: %d, Creados: %d, Actualizados: %d, Sin cambios: %d',
+            $result['total']   ?? 0,
+            $result['created'] ?? 0,
+            $result['updated'] ?? 0,
+            $result['skipped'] ?? 0,
         ));
 
         return self::SUCCESS;

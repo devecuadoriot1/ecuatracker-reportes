@@ -26,6 +26,8 @@ class SyncVehiculosService
 
         $created = 0;
         $updated = 0;
+        $skipped = 0;
+        $total   = count($devices);
 
         foreach ($devices as $device) {
             // Estructura típica GPSWOX/Ecuatracker
@@ -112,17 +114,23 @@ class SyncVehiculosService
             if ($dirty && ! $dryRun) {
                 $vehiculo->save();
                 $updated++;
+            } elseif (! $dirty) {
+                $skipped++;
             }
         }
 
         Log::info('[SyncVehiculos] Sincronizacion completada', [
+            'total'   => $total,
             'created' => $created,
             'updated' => $updated,
+            'skipped' => $skipped,
         ]);
 
         return [
+            'total'   => $total,
             'created' => $created,
             'updated' => $updated,
+            'skipped' => $skipped,
         ];
     }
 

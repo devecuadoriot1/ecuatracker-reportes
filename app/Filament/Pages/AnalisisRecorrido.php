@@ -6,14 +6,17 @@ namespace App\Filament\Pages;
 
 use App\Models\Vehiculo;
 use App\Filament\Forms\Components\VehiculosSelector;
-use App\Services\Reportes\AnalisisRecorridoService; // lo puedes dejar por si luego haces previews
+use App\Services\Reportes\AnalisisRecorridoService;
 use Filament\Actions\Action as FormAction;
 use Filament\Schemas\Components\Utilities\Set;
+use App\Services\Reportes\ParametrizacionKmService;
+use Filament\Actions;
 use BackedEnum;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -186,6 +189,103 @@ class AnalisisRecorrido extends Page
             'hora_desde'   => $horaDesdeStr,
             'hora_hasta'   => $horaHastaStr,
             'vehiculo_ids' => array_map('intval', $data['vehiculo_ids'] ?? []),
+        ];
+    }
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('configurar_parametrizaciones_km')
+                ->label('Configurar rangos de km')
+                ->icon('heroicon-m-adjustments-horizontal')
+                ->modalHeading('Configurar rangos de parametrización de km')
+                ->modalWidth('3xl')
+                ->form([
+                    Section::make('Rangos semanales')
+                        ->description('Se usan para cada semana y para el promedio mensual.')
+                        ->schema([
+                            Forms\Components\Repeater::make('semana')
+                                ->label('Rangos de km por semana')
+                                ->schema([
+                                    Forms\Components\TextInput::make('nombre')
+                                        ->label('Nombre')
+                                        ->required()
+                                        ->maxLength(50),
+
+                                    Forms\Components\TextInput::make('km_min')
+                                        ->label('Km mínimo')
+                                        ->numeric()
+                                        ->required(),
+
+                                    Forms\Components\TextInput::make('km_max')
+                                        ->label('Km máximo')
+                                        ->numeric()
+                                        ->required(),
+
+                                    Forms\Components\TextInput::make('orden')
+                                        ->label('Orden')
+                                        ->numeric()
+                                        ->required()
+                                        ->default(0),
+                                ])
+                                ->columns(4)
+                                ->default([]),
+                        ]),
+
+                    Section::make('Rangos mensuales (total)')
+                        ->description('Se usan para el total mensual de km.')
+                        ->schema([
+                            Forms\Components\Repeater::make('mes_total')
+                                ->label('Rangos de km por mes (total)')
+                                ->schema([
+                                    Forms\Components\TextInput::make('nombre')
+                                        ->label('Nombre')
+                                        ->required()
+                                        ->maxLength(50),
+
+                                    Forms\Components\TextInput::make('km_min')
+                                        ->label('Km mínimo')
+                                        ->numeric()
+                                        ->required(),
+
+                                    Forms\Components\TextInput::make('km_max')
+                                        ->label('Km máximo')
+                                        ->numeric()
+                                        ->required(),
+
+                                    Forms\Components\TextInput::make('orden')
+                                        ->label('Orden')
+                                        ->numeric()
+                                        ->required()
+                                        ->default(0),
+                                ])
+                                ->columns(4)
+                                ->default([]),
+                        ]),
+                ])
+                ->mountUsing(function (Schema $form, ParametrizacionKmService $service) {
+                    $form->fill($service->getRangosParaFormulario());
+                })
+                ->action(function (array $data, ParametrizacionKmService $service) {
+                    try {
+                        $service->actualizarRangosDesdeFormulario($data);
+
+                        Notification::make()
+                            ->title('Parametrización actualizada')
+                            ->body('Los rangos de km se han guardado correctamente.')
+                            ->success()
+                            ->send();
+                    } catch (\Throwable $e) {
+                        Log::error('Error al actualizar parametrización de km desde AnalisisRecorrido', [
+                            'error' => $e->getMessage(),
+                        ]);
+
+                        Notification::make()
+                            ->title('Error al guardar parametrización')
+                            ->body('Ocurrió un error al guardar los rangos. Verifique los datos e intente nuevamente.')
+                            ->danger()
+                            ->send();
+                    }
+                }),
         ];
     }
 }
