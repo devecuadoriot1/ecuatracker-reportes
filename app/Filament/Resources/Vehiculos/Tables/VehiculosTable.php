@@ -20,7 +20,7 @@ class VehiculosTable
             ->query(Vehiculo::query()) // Aquí luego puedes enganchar tus scopes
             ->columns([
                 TextColumn::make('codigo')
-                    ->label('Codigo')
+                    ->label('Código')
                     ->sortable()
                     ->searchable(),
 
@@ -30,32 +30,37 @@ class VehiculosTable
                     ->searchable(),
 
                 TextColumn::make('placas')
+                    ->label('Placas')
                     ->sortable()
                     ->searchable(),
 
                 TextColumn::make('marca')
+                    ->label('Marca')
                     ->toggleable(),
 
                 TextColumn::make('modelo')
+                    ->label('Modelo')
                     ->toggleable(),
 
                 TextColumn::make('tipo')
+                    ->label('Tipo')
                     ->toggleable(),
 
                 TextColumn::make('anio')
-                    ->label('Ano')
+                    ->label('Año')
                     ->sortable()
                     ->toggleable(),
 
                 TextColumn::make('area_asignada')
-                    ->label('Area')
+                    ->label('Área asignada')
                     ->toggleable(),
 
                 TextColumn::make('responsable')
+                    ->label('Responsable')
                     ->toggleable(),
 
                 TextColumn::make('gerencia_asignada')
-                    ->label('Gerencia')
+                    ->label('Gerencia asignada')
                     ->toggleable(),
             ])
             ->filters([
