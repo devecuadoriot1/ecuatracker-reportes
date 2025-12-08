@@ -1,5 +1,5 @@
 @php
-/** @var array<int,array{title:string,items:array<int,array{id:int,label:string}>>> $groups */
+/** @var array<int,array{title:string,items:array<int,array{id:int,label:string}>> $groups */
     $groups = $getGroupsForView();
     @endphp
 
@@ -9,7 +9,7 @@
         <div
             x-data="vehiculosSelector({
             state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$getStatePath()}')") }},
-            groups: {{ json_encode($groups, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }},
+            groups: @js($groups),
             groupsPerPage: {{ $getGroupsPerPage() }},
         })"
             x-init="init()"
@@ -158,18 +158,28 @@
                     this.groups.forEach(group => {
                         this.openGroups[group.title] = true;
                     });
+
+                    // Aseguramos que el estado inicial esté normalizado
+                    this.state = this.normalizedState();
                 },
 
                 normalizedState() {
-                    if (Array.isArray(this.state)) {
-                        return this.state;
+                    let raw = this.state ?? [];
+
+                    if (!Array.isArray(raw)) {
+                        raw = [raw];
                     }
 
-                    if (this.state === null || this.state === undefined || this.state === '') {
-                        return [];
-                    }
+                    // Convertimos todo a enteros y filtramos NaN
+                    const normalized = raw
+                        .map(value => Number(value))
+                        .filter(value => !Number.isNaN(value));
 
-                    return [this.state];
+                    return normalized;
+                },
+
+                isItemSelected(id) {
+                    return this.normalizedState().includes(id);
                 },
 
                 // --- Helpers de grupos / items ---
@@ -203,9 +213,10 @@
                 },
 
                 // --- Selección ---
-
                 toggleItem(id) {
+                    id = Number(id);
                     const current = this.normalizedState();
+
                     if (current.includes(id)) {
                         this.state = current.filter(v => v !== id);
                     } else {

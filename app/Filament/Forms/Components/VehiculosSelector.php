@@ -14,7 +14,7 @@ use Illuminate\Support\Collection;
  * Selector avanzado de vehículos:
  * - Grupos por group_title (incluye "Sin grupo")
  * - Selección individual
- * - Seleccionar all global
+ * - Seleccionar todo global
  * - Seleccionar por grupo
  * - Paginación por grupos
  *
@@ -32,9 +32,14 @@ class VehiculosSelector extends Field
     /**
      * Permite modificar la query base para multi-tenant, filtros, etc.
      *
-     * @var Closure|null
+     * @var (Closure(Builder): Builder)|null
      */
-    protected $query = null;
+    protected ?Closure $queryCallback = null;
+
+    /**
+     * Si es true, solo muestra vehículos que tienen un dispositivo asignado.
+     */
+    protected bool | Closure $onlyWithDevice = true;
 
     public function groupsPerPage(int | Closure | null $groupsPerPage): static
     {
@@ -53,30 +58,48 @@ class VehiculosSelector extends Field
     /**
      * Configura una callback para modificar la query base de Vehiculo.
      *
-     * @param  Closure(Builder):Builder|null  $callback
+     * @param  (Closure(Builder): Builder)|null  $callback
      */
     public function query(?Closure $callback): static
     {
-        $this->query = $callback;
+        $this->queryCallback = $callback;
 
         return $this;
     }
 
     /**
+     * Indica si se deben mostrar solo vehículos con dispositivo.
+     */
+    public function onlyWithDevice(bool | Closure $value = true): static
+    {
+        $this->onlyWithDevice = $value;
+
+        return $this;
+    }
+
+    protected function shouldShowOnlyWithDevice(): bool
+    {
+        return (bool) $this->evaluate($this->onlyWithDevice);
+    }
+
+    /**
      * Obtiene los vehículos que se mostrarán en el selector.
      *
-     * @return Collection<int, Vehiculo>
+     * @return Collection<int,Vehiculo>
      */
     public function getVehiculos(): Collection
     {
-        $query = Vehiculo::query()->ordered();
+        $query = Vehiculo::query()
+            ->select(['id', 'group_title', 'nombre_api'])
+            ->ordered();
 
-        if ($this->query instanceof Closure) {
-            $query = ($this->query)($query) ?? $query;
+        if ($this->shouldShowOnlyWithDevice()) {
+            $query->whereNotNull('device_id');
         }
 
-        // Solo traemos columnas necesarias para el selector.
-        $query->select(['id', 'group_title', 'nombre_api']);
+        if ($this->queryCallback instanceof Closure) {
+            $query = ($this->queryCallback)($query) ?? $query;
+        }
 
         return $query->get();
     }
@@ -84,7 +107,7 @@ class VehiculosSelector extends Field
     /**
      * Estructura normalizada para el componente Alpine.
      *
-     * @return array<int, array{title:string,items:array<int,array{id:int,label:string}>>>
+     * @return array<int,array{title:string,items:array<int,array{id:int,label:string}>>>
      */
     public function getGroupsForView(): array
     {
@@ -98,7 +121,7 @@ class VehiculosSelector extends Field
                         ->values()
                         ->map(fn(Vehiculo $v): array => [
                             'id'    => $v->id,
-                            'label' => $v->select_label, // reutilizamos el accessor del modelo
+                            'label' => $v->select_label,
                         ])
                         ->all(),
                 ];

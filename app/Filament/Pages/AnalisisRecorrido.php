@@ -4,14 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
-use App\Models\Vehiculo;
 use App\Filament\Forms\Components\VehiculosSelector;
-use App\Services\Reportes\AnalisisRecorridoService;
-use Filament\Actions\Action as FormAction;
-use Filament\Schemas\Components\Utilities\Set;
 use App\Services\Reportes\ParametrizacionKmService;
-use Filament\Actions;
 use BackedEnum;
+use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -130,9 +126,18 @@ class AnalisisRecorrido extends Page
                 ->send();
         } catch (\Throwable $e) {
             Log::error('Error al preparar descarga de análisis de recorrido desde Filament', [
-                'data'  => $data,
-                'error' => $e->getMessage(),
+                'titulo'       => $data['titulo'] ?? null,
+                'modo'         => $data['modo'] ?? null,
+                'formato'      => $data['formato'] ?? null,
+                'vehiculos'    => is_array($data['vehiculo_ids'] ?? null) ? count($data['vehiculo_ids']) : null,
+                'error'        => $e->getMessage(),
             ]);
+
+            Notification::make()
+                ->title('Reporte en proceso')
+                ->body('La descarga del reporte debería iniciarse en unos segundos. Si no ocurre, revise su bloqueador de pop-ups.')
+                ->success()
+                ->send();
 
             Notification::make()
                 ->title('Error al generar el reporte')
@@ -157,16 +162,25 @@ class AnalisisRecorrido extends Page
         $fechaDesde = '';
         $fechaHasta = '';
 
-        if ($desde instanceof Carbon) {
-            $fechaDesde = $desde->toDateString();
-        } elseif (is_string($desde) && $desde !== '') {
-            $fechaDesde = Carbon::parse($desde)->toDateString();
+        try {
+            if ($desde instanceof Carbon) {
+                $fechaDesde = $desde->toDateString();
+            } elseif (is_string($desde) && $desde !== '') {
+                $fechaDesde = Carbon::parse($desde)->toDateString();
+            }
+        } catch (\Throwable $e) {
+            // Si algo raro pasa, dejamos fechaDesde vacío; el controller lo validará
+            $fechaDesde = '';
         }
 
-        if ($hasta instanceof Carbon) {
-            $fechaHasta = $hasta->toDateString();
-        } elseif (is_string($hasta) && $hasta !== '') {
-            $fechaHasta = Carbon::parse($hasta)->toDateString();
+        try {
+            if ($hasta instanceof Carbon) {
+                $fechaHasta = $hasta->toDateString();
+            } elseif (is_string($hasta) && $hasta !== '') {
+                $fechaHasta = Carbon::parse($hasta)->toDateString();
+            }
+        } catch (\Throwable $e) {
+            $fechaHasta = '';
         }
 
         $horaDesde = $data['hora_desde'] ?? null;
@@ -180,17 +194,29 @@ class AnalisisRecorrido extends Page
             ? $horaHasta->format('H:i')
             : ((string) ($horaHasta ?: '23:59'));
 
+        $titulo  = trim((string) ($data['titulo'] ?? ''));
+        $modo    = strtolower((string) ($data['modo'] ?? 'semanal'));
+        $formato = strtolower((string) ($data['formato'] ?? 'excel'));
+
+        $vehiculoIds = collect($data['vehiculo_ids'] ?? [])
+            ->map(fn($id) => (int) $id)
+            ->filter(fn(int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
         return [
-            'titulo'       => (string) ($data['titulo'] ?? ''),
-            'modo'         => (string) ($data['modo'] ?? 'semanal'),
-            'formato'      => (string) ($data['formato'] ?? 'excel'),
+            'titulo'       => $titulo,
+            'modo'         => $modo,
+            'formato'      => $formato,
             'fecha_desde'  => $fechaDesde,
             'fecha_hasta'  => $fechaHasta,
             'hora_desde'   => $horaDesdeStr,
             'hora_hasta'   => $horaHastaStr,
-            'vehiculo_ids' => array_map('intval', $data['vehiculo_ids'] ?? []),
+            'vehiculo_ids' => $vehiculoIds,
         ];
     }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -214,12 +240,14 @@ class AnalisisRecorrido extends Page
                                     Forms\Components\TextInput::make('km_min')
                                         ->label('Km mínimo')
                                         ->numeric()
-                                        ->required(),
+                                        ->required()
+                                        ->minValue(0),
 
                                     Forms\Components\TextInput::make('km_max')
                                         ->label('Km máximo')
                                         ->numeric()
-                                        ->required(),
+                                        ->required()
+                                        ->minValue(0),
 
                                     Forms\Components\TextInput::make('orden')
                                         ->label('Orden')
@@ -245,12 +273,14 @@ class AnalisisRecorrido extends Page
                                     Forms\Components\TextInput::make('km_min')
                                         ->label('Km mínimo')
                                         ->numeric()
-                                        ->required(),
+                                        ->required()
+                                        ->minValue(0),
 
                                     Forms\Components\TextInput::make('km_max')
                                         ->label('Km máximo')
                                         ->numeric()
-                                        ->required(),
+                                        ->required()
+                                        ->minValue(0),
 
                                     Forms\Components\TextInput::make('orden')
                                         ->label('Orden')

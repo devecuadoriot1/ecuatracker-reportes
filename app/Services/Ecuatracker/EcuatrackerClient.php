@@ -7,6 +7,7 @@ namespace App\Services\Ecuatracker;
 use App\Exceptions\ApiException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\PendingRequest;
 
 class EcuatrackerClient
 {
@@ -21,6 +22,14 @@ class EcuatrackerClient
         $this->userApiHash = $userApiHash ?: (string) config('ecuatracker.user_api_hash');
         $this->timeout     = (int) config('ecuatracker.timeout', 15);
         $this->debug       = (bool) config('app.debug', false);
+
+        if ($this->baseUrl === '' || !str_starts_with($this->baseUrl, 'http')) {
+            throw new ApiException(
+                'ECUATRACKER_BASE_URL no está configurada correctamente.',
+                0,
+                ['config' => 'ecuatracker.base_url']
+            );
+        }
 
         if ($this->userApiHash === '') {
             throw new ApiException(
@@ -38,6 +47,15 @@ class EcuatrackerClient
         }
     }
 
+    /**
+     * Configración comun del cliente HTTP, falla rápido si la url esta mal
+     */
+    private function http(): PendingRequest
+    {
+        return Http::timeout($this->timeout)
+            ->retry(2, 200)
+            ->acceptJson();
+    }
     /**
      * GET /get_devices
      *
@@ -179,9 +197,7 @@ class EcuatrackerClient
                 ]);
             }
 
-            $response = Http::timeout($this->timeout)
-                ->acceptJson()
-                ->get($url);
+            $response = $this->http()->get($url);
 
             if ($response->failed()) {
                 $this->logAndThrow('GET', $url, [], $response->status(), $response->body());
@@ -225,9 +241,7 @@ class EcuatrackerClient
                 ]);
             }
 
-            $response = Http::timeout($this->timeout)
-                ->acceptJson()
-                ->get($url, $query);
+            $response = $this->http()->get($url, $query);
 
             if ($response->failed()) {
                 $this->logAndThrow('GET', $path, $this->maskArray($query), $response->status(), $response->body());
@@ -269,14 +283,12 @@ class EcuatrackerClient
             Log::info('[EcuatrackerClient] POST', [
                 'url'        => $this->maskUrl($url),
                 'query'      => $this->maskArray($query),
-                // útil para verificar rápidamente qué hash se está usando, sin exponerlo completo
                 'hash_start' => substr($this->userApiHash, 0, 8) . '***',
             ]);
         }
 
         try {
-            $response = Http::timeout($this->timeout)
-                ->acceptJson()
+            $response = $this->http()
                 ->asJson()
                 ->withQueryParameters($query)
                 ->post($url, $payload);

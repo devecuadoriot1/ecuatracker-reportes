@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('vehiculos', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('device_id')->unique();
+            $table->unsignedBigInteger('device_id')->nullable()->unique();
             $table->unsignedBigInteger('codigo')->nullable();
             $table->unsignedBigInteger('group_id')->nullable();
             $table->string('group_title')->nullable();
@@ -31,6 +31,8 @@ return new class extends Migration {
             $table->index('placas');
             $table->index('codigo');
             $table->unique('imei');
+            $table->index('group_id');
+            $table->index('group_title');
             $table->index('area_asignada');
         });
     }

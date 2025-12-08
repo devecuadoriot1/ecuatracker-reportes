@@ -12,13 +12,14 @@ use Illuminate\Support\Facades\Log;
 class AnalisisRecorridoService
 {
     protected readonly bool $debug;
-    protected int $chunkSize = 100; // Límite de devices por petición para evitar URLs enormes
+    protected int $chunkSize; // Límite de devices por petición para evitar URLs enormes
 
     public function __construct(
         protected readonly EcuatrackerClient $ecuatrackerClient,
         protected readonly ParametrizacionKmService $parametrizacionKmService,
     ) {
         $this->debug = (bool) config('app.debug', false);
+        $this->chunkSize = (int) config('ecuatracker.report_chunk_size', 100);
     }
 
     /**

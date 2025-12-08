@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -46,17 +48,15 @@ class Vehiculo extends Model
      */
     public function scopeSearch(Builder $query, ?string $search): Builder
     {
-        $search = $search !== null ? trim($search) : '';
+        $search = trim((string) $search);
 
-        if ($search === '') {
-            return $query;
-        }
-
-        return $query->where(function (Builder $q) use ($search) {
-            $q->where('nombre_api', 'like', '%' . $search . '%')
-                ->orWhere('placas', 'like', '%' . $search . '%')
-                ->orWhere('marca', 'like', '%' . $search . '%')
-                ->orWhere('modelo', 'like', '%' . $search . '%');
+        return $query->when($search !== '', function (Builder $q) use ($search) {
+            $q->where(function (Builder $q2) use ($search) {
+                $q2->where('nombre_api', 'like', "%{$search}%")
+                    ->orWhere('placas', 'like', "%{$search}%")
+                    ->orWhere('marca', 'like', "%{$search}%")
+                    ->orWhere('modelo', 'like', "%{$search}%");
+            });
         });
     }
 
@@ -73,6 +73,9 @@ class Vehiculo extends Model
             ->orderBy('placas');
     }
 
+    /**
+     * Etiqueta amigable para selects / listados.
+     */
     public function getSelectLabelAttribute(): string
     {
         $parts = [];

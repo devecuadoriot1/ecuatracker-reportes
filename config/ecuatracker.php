@@ -39,4 +39,7 @@ return [
     'report_types' => [
         'analisis_recorrido_km' => (int) env('ECUATRACKER_REPORT_TYPE_ANALISIS_RECORRIDO', 1),
     ],
+
+    'report_chunk_size' => env('ECUATRACKER_REPORT_CHUNK_SIZE', 100),
+
 ];

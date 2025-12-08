@@ -22,14 +22,11 @@ class SyncVehiculosService
      */
     public function sync(bool $dryRun = false): array
     {
-        $devices = $this->ecuatrackerClient->getDevices();
+        $rawDevices = $this->ecuatrackerClient->getDevices();
 
-        $created = 0;
-        $updated = 0;
-        $skipped = 0;
-        $total   = count($devices);
+        $normalized = [];
 
-        foreach ($devices as $device) {
+        foreach ($rawDevices as $device) {
             // Estructura típica GPSWOX/Ecuatracker
             $deviceId    = $device['id'] ?? $device['device_id'] ?? null;
             $name        = $device['name'] ?? $device['device_name'] ?? null;
@@ -45,29 +42,45 @@ class SyncVehiculosService
 
             $deviceId = (int) $deviceId;
             $codigo   = $this->extractCodigoFromName($name);
+            $group    = $this->extractGroupInfo($device);
+            // $groupInfo = $this->extractGroupInfo($device);
+            // $groupId    = $groupInfo['group_id'];
+            // $groupTitle = $groupInfo['group_title'];
+            $normalized[$deviceId] = [
+                'device_id'   => $deviceId,
+                'nombre_api'  => $name,
+                'codigo'      => $codigo,
+                'imei'        => $imei,
+                'placas'      => $plateNumber,
+                'group_id'    => $group['group_id'],
+                'group_title' => $group['group_title'],
+            ];
+        }
 
-            // NUEVO: extraer info de grupo
-            $groupInfo = $this->extractGroupInfo($device);
-            $groupId    = $groupInfo['group_id'];
-            $groupTitle = $groupInfo['group_title'];
+        $deviceIds = array_keys($normalized);
+        $vehiculosExistentes = Vehiculo::whereIn('device_id', $deviceIds)
+            ->get()
+            ->keyBy('device_id');
 
-            $vehiculo = Vehiculo::where('device_id', $deviceId)->first();
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $total   = count($normalized);
+
+        foreach ($normalized as $deviceId => $data) {
+            /** @var Vehiculo|null $vehiculo */
+            $vehiculo = $vehiculosExistentes->get($deviceId);
 
             if ($vehiculo === null) {
                 // Crear nuevo
                 $vehiculo = new Vehiculo();
-                $vehiculo->device_id  = $deviceId;
-                $vehiculo->nombre_api = $name;
-                $vehiculo->codigo     = $codigo;
-                $vehiculo->imei       = $imei;
-
-                if ($plateNumber) {
-                    $vehiculo->placas = $plateNumber;
-                }
-
-                // grupo siempre viene de la API, no es campo “manual”
-                $vehiculo->group_id    = $groupId;
-                $vehiculo->group_title = $groupTitle;
+                $vehiculo->device_id  = $data['device_id'];
+                $vehiculo->nombre_api = $data['nombre_api'];
+                $vehiculo->codigo     = $data['codigo'];
+                $vehiculo->imei       = $data['imei'];
+                $vehiculo->placas     = $data['placas'];
+                $vehiculo->group_id   = $data['group_id'];
+                $vehiculo->group_title = $data['group_title'];
 
                 if (! $dryRun) {
                     $vehiculo->save();
@@ -80,34 +93,33 @@ class SyncVehiculosService
             // Actualizar solo campos provenientes de la API
             $dirty = false;
 
-            if ($vehiculo->nombre_api !== $name) {
-                $vehiculo->nombre_api = $name;
+            if ($vehiculo->nombre_api !== $data['nombre_api']) {
+                $vehiculo->nombre_api = $data['nombre_api'];
                 $dirty = true;
             }
 
-            if ($codigo !== null && $vehiculo->codigo !== $codigo) {
-                $vehiculo->codigo = $codigo;
+            if ($data['codigo'] !== null && $vehiculo->codigo !== $data['codigo']) {
+                $vehiculo->codigo = $data['codigo'];
                 $dirty = true;
             }
 
-            if ($imei && $vehiculo->imei !== $imei) {
-                $vehiculo->imei = $imei;
+            if ($data['imei'] && $vehiculo->imei !== $data['imei']) {
+                $vehiculo->imei = $data['imei'];
                 $dirty = true;
             }
 
-            if ($plateNumber && $vehiculo->placas !== $plateNumber) {
-                $vehiculo->placas = $plateNumber;
+            if ($data['placas'] && $vehiculo->placas !== $data['placas']) {
+                $vehiculo->placas = $data['placas'];
                 $dirty = true;
             }
 
-            // grupo (siempre viene de la API, se puede pisar seguro)
-            if ($vehiculo->group_id !== $groupId) {
-                $vehiculo->group_id = $groupId;
+            if ($vehiculo->group_id !== $data['group_id']) {
+                $vehiculo->group_id = $data['group_id'];
                 $dirty = true;
             }
 
-            if ($vehiculo->group_title !== $groupTitle) {
-                $vehiculo->group_title = $groupTitle;
+            if ($vehiculo->group_title !== $data['group_title']) {
+                $vehiculo->group_title = $data['group_title'];
                 $dirty = true;
             }
 
@@ -126,12 +138,7 @@ class SyncVehiculosService
             'skipped' => $skipped,
         ]);
 
-        return [
-            'total'   => $total,
-            'created' => $created,
-            'updated' => $updated,
-            'skipped' => $skipped,
-        ];
+        return compact('total', 'created', 'updated', 'skipped');
     }
 
 

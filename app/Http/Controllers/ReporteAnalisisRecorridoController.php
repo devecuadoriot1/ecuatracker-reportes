@@ -27,7 +27,6 @@ class ReporteAnalisisRecorridoController extends Controller
     use SanitizesPdfContent;
 
     public function __construct(
-        protected readonly EcuatrackerClient $ecuatrackerClient,
         protected readonly AnalisisRecorridoService $analisisRecorridoService,
     ) {
         // $this->middleware('auth'); // cuando actives auth/roles
@@ -92,10 +91,25 @@ class ReporteAnalisisRecorridoController extends Controller
      */
     private function generateReportResponse(array $data, bool $fromPostRequest): Response
     {
-        try {
-            $horaDesde = $data['hora_desde'] ?? '00:00';
-            $horaHasta = $data['hora_hasta'] ?? '23:59';
+        $horaDesde = $data['hora_desde'] ?? '00:00';
+        $horaHasta = $data['hora_hasta'] ?? '23:59';
 
+        $fechaDesde = trim((string) ($data['fecha_desde'] ?? ''));
+        $fechaHasta = trim((string) ($data['fecha_hasta'] ?? ''));
+
+        if ($fechaDesde === '' || $fechaHasta === '') {
+            $msg = 'Debe espesificar fechas de inicio y fechas fin.';
+
+            if ($fromPostRequest) {
+                return redirect()
+                    ->back()
+                    ->withInput()
+                    ->withErrors(['rango' => $msg]);
+            }
+            abort(422, $msg);
+        }
+
+        try {
             $desde = Carbon::parse(($data['fecha_desde'] ?? '') . ' ' . $horaDesde);
             $hasta = Carbon::parse(($data['fecha_hasta'] ?? '') . ' ' . $horaHasta);
         } catch (\Throwable $e) {
@@ -129,8 +143,13 @@ class ReporteAnalisisRecorridoController extends Controller
             abort(422, $msg);
         }
 
-        // ---------------- Vehículos / dispositivos ----------------
-        $vehiculoIds = array_map('intval', $data['vehiculo_ids'] ?? []);
+        /**Evitar IDs bausra, duplicados, se mantiene el tipo INT */
+        $vehiculoIds = collect($data['vehiculo_ids'] ?? [])
+            ->map(fn($id) => (int) $id)
+            ->filter(fn(int $id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
 
         $deviceIds = Vehiculo::whereIn('id', $vehiculoIds)
             ->pluck('device_id')

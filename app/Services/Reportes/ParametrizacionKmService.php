@@ -8,6 +8,7 @@ use App\Models\ParametrizacionKm;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class ParametrizacionKmService
 {
@@ -107,7 +108,6 @@ class ParametrizacionKmService
         $mesTotal = $data['mes_total'] ?? [];
 
         DB::transaction(function () use ($semana, $mesTotal): void {
-            // Borramos lo existente para estos tipos
             ParametrizacionKm::query()
                 ->whereIn('tipo', [ParametrizacionKm::TIPO_SEMANA, ParametrizacionKm::TIPO_MES_TOTAL])
                 ->delete();
@@ -116,8 +116,10 @@ class ParametrizacionKmService
             $this->crearRangosDesdeArray($mesTotal, ParametrizacionKm::TIPO_MES_TOTAL);
         });
 
-        // Limpiamos cache interno para que en la misma request no se queden valores antiguos
+        // Limpiamos cache interno y global
         unset($this->cache[ParametrizacionKm::TIPO_SEMANA], $this->cache[ParametrizacionKm::TIPO_MES_TOTAL]);
+        Cache::forget('param_km:' . ParametrizacionKm::TIPO_SEMANA);
+        Cache::forget('param_km:' . ParametrizacionKm::TIPO_MES_TOTAL);
 
         Log::info('[ParametrizacionKm] Rangos actualizados desde formulario', [
             'semana_count'    => \count($semana),
@@ -135,17 +137,20 @@ class ParametrizacionKmService
     protected function getRangosPorTipo(string $tipo): Collection
     {
         if (! isset($this->cache[$tipo])) {
-            $rangos = ParametrizacionKm::query()
-                ->tipo($tipo)
-                ->orderBy('orden')
-                ->get();
+            $cacheKey = "param_km:{$tipo}";
 
-            // Si la tabla está vacía para este tipo, creamos los rangos por defecto en BD
-            if ($rangos->isEmpty()) {
-                $rangos = $this->createDefaultRangos($tipo);
-            }
+            $this->cache[$tipo] = Cache::remember($cacheKey, 3600, function () use ($tipo) {
+                $rangos = ParametrizacionKm::query()
+                    ->tipo($tipo)
+                    ->orderBy('orden')
+                    ->get();
 
-            $this->cache[$tipo] = $rangos;
+                if ($rangos->isEmpty()) {
+                    $rangos = $this->createDefaultRangos($tipo);
+                }
+
+                return $rangos;
+            });
         }
 
         return $this->cache[$tipo];
