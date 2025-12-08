@@ -1,13 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
@@ -44,5 +48,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Controla quién puede acceder al panel Filament.
+     * Aquí puedes poner tu lógica de roles/permisos.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Versión simple (para empezar): cualquier usuario autenticado puede entrar.
+        return true;
+
+        /*
+        // Ejemplo más restrictivo (cuando tengas roles):
+        return $this->is_admin === true;
+        */
     }
 }
