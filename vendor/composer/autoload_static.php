@@ -798,6 +798,7 @@ class ComposerStaticInit626b9e7ddd47fb7eff9aaa53cce0c9ad
         'App\\Exports\\AnalisisRecorridoMensualExport' => __DIR__ . '/../..' . '/app/Exports/AnalisisRecorridoMensualExport.php',
         'App\\Exports\\AnalisisRecorridoSemanalExport' => __DIR__ . '/../..' . '/app/Exports/AnalisisRecorridoSemanalExport.php',
         'App\\Exports\\BaseAnalisisRecorridoExport' => __DIR__ . '/../..' . '/app/Exports/BaseAnalisisRecorridoExport.php',
+        'App\\Filament\\Forms\\Components\\DateTimeRangePicker' => __DIR__ . '/../..' . '/app/Filament/Forms/Components/DateTimeRangePicker.php',
         'App\\Filament\\Forms\\Components\\VehiculosSelector' => __DIR__ . '/../..' . '/app/Filament/Forms/Components/VehiculosSelector.php',
         'App\\Filament\\Pages\\AnalisisRecorrido' => __DIR__ . '/../..' . '/app/Filament/Pages/AnalisisRecorrido.php',
         'App\\Filament\\Resources\\Vehiculos\\Pages\\CreateVehiculo' => __DIR__ . '/../..' . '/app/Filament/Resources/Vehiculos/Pages/CreateVehiculo.php',

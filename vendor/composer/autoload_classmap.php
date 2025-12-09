@@ -17,6 +17,7 @@ return array(
     'App\\Exports\\AnalisisRecorridoMensualExport' => $baseDir . '/app/Exports/AnalisisRecorridoMensualExport.php',
     'App\\Exports\\AnalisisRecorridoSemanalExport' => $baseDir . '/app/Exports/AnalisisRecorridoSemanalExport.php',
     'App\\Exports\\BaseAnalisisRecorridoExport' => $baseDir . '/app/Exports/BaseAnalisisRecorridoExport.php',
+    'App\\Filament\\Forms\\Components\\DateTimeRangePicker' => $baseDir . '/app/Filament/Forms/Components/DateTimeRangePicker.php',
     'App\\Filament\\Forms\\Components\\VehiculosSelector' => $baseDir . '/app/Filament/Forms/Components/VehiculosSelector.php',
     'App\\Filament\\Pages\\AnalisisRecorrido' => $baseDir . '/app/Filament/Pages/AnalisisRecorrido.php',
     'App\\Filament\\Resources\\Vehiculos\\Pages\\CreateVehiculo' => $baseDir . '/app/Filament/Resources/Vehiculos/Pages/CreateVehiculo.php',

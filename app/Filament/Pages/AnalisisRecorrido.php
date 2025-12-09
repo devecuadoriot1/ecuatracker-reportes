@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Forms\Components\VehiculosSelector;
 use App\Services\Reportes\ParametrizacionKmService;
+use App\Filament\Forms\Components\DateTimeRangePicker;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
@@ -36,11 +37,13 @@ class AnalisisRecorrido extends Page
     public function mount(): void
     {
         $this->form->fill([
-            'titulo'     => 'Análisis de recorrido',
-            'modo'       => 'semanal',
-            'formato'    => 'excel',
-            'hora_desde' => '00:00',
-            'hora_hasta' => '23:59',
+            'titulo' => 'Análisis de recorrido',
+            'modo'   => 'semanal',
+            'formato' => 'excel',
+            'rango'  => [
+                'from' => null,
+                'to'   => null,
+            ],
         ]);
     }
 
@@ -61,23 +64,9 @@ class AnalisisRecorrido extends Page
                     ])
                     ->required(),
 
-                Forms\Components\DatePicker::make('desde')
-                    ->label('Desde')
+                DateTimeRangePicker::make('rango')
+                    ->label('Rango de fechas y horas')
                     ->required(),
-
-                Forms\Components\DatePicker::make('hasta')
-                    ->label('Hasta')
-                    ->required(),
-
-                Forms\Components\TimePicker::make('hora_desde')
-                    ->label('Hora desde')
-                    ->seconds(false)
-                    ->nullable(),
-
-                Forms\Components\TimePicker::make('hora_hasta')
-                    ->label('Hora hasta')
-                    ->seconds(false)
-                    ->nullable(),
 
                 Forms\Components\Select::make('formato')
                     ->label('Formato')
@@ -156,64 +145,67 @@ class AnalisisRecorrido extends Page
      */
     private function buildReportPayload(array $data): array
     {
-        $desde = $data['desde'] ?? null;
-        $hasta = $data['hasta'] ?? null;
-
         $fechaDesde = '';
         $fechaHasta = '';
+        $horaDesdeStr = '00:00';
+        $horaHastaStr = '23:59';
 
-        try {
+        // Nuevo: usamos el campo "rango"
+        $rango = $data['rango'] ?? null;
+
+        if (is_array($rango)) {
+            $from = $rango['from'] ?? null;
+            $to   = $rango['to']   ?? null;
+
+            if ($from) {
+                $fromCarbon   = $from instanceof Carbon ? $from : Carbon::parse($from);
+                $fechaDesde   = $fromCarbon->toDateString();
+                $horaDesdeStr = $fromCarbon->format('H:i');
+            }
+
+            if ($to) {
+                $toCarbon   = $to instanceof Carbon ? $to : Carbon::parse($to);
+                $fechaHasta = $toCarbon->toDateString();
+                $horaHastaStr = $toCarbon->format('H:i');
+            }
+        } else {
+            // Fallback por compatibilidad con el antiguo esquema (por si acaso)
+            $desde = $data['desde'] ?? null;
+            $hasta = $data['hasta'] ?? null;
+
             if ($desde instanceof Carbon) {
                 $fechaDesde = $desde->toDateString();
             } elseif (is_string($desde) && $desde !== '') {
                 $fechaDesde = Carbon::parse($desde)->toDateString();
             }
-        } catch (\Throwable $e) {
-            // Si algo raro pasa, dejamos fechaDesde vacío; el controller lo validará
-            $fechaDesde = '';
-        }
 
-        try {
             if ($hasta instanceof Carbon) {
                 $fechaHasta = $hasta->toDateString();
             } elseif (is_string($hasta) && $hasta !== '') {
                 $fechaHasta = Carbon::parse($hasta)->toDateString();
             }
-        } catch (\Throwable $e) {
-            $fechaHasta = '';
+
+            $horaDesde = $data['hora_desde'] ?? null;
+            $horaHasta = $data['hora_hasta'] ?? null;
+
+            $horaDesdeStr = $horaDesde instanceof Carbon
+                ? $horaDesde->format('H:i')
+                : ((string) ($horaDesde ?: '00:00'));
+
+            $horaHastaStr = $horaHasta instanceof Carbon
+                ? $horaHasta->format('H:i')
+                : ((string) ($horaHasta ?: '23:59'));
         }
 
-        $horaDesde = $data['hora_desde'] ?? null;
-        $horaHasta = $data['hora_hasta'] ?? null;
-
-        $horaDesdeStr = $horaDesde instanceof Carbon
-            ? $horaDesde->format('H:i')
-            : ((string) ($horaDesde ?: '00:00'));
-
-        $horaHastaStr = $horaHasta instanceof Carbon
-            ? $horaHasta->format('H:i')
-            : ((string) ($horaHasta ?: '23:59'));
-
-        $titulo  = trim((string) ($data['titulo'] ?? ''));
-        $modo    = strtolower((string) ($data['modo'] ?? 'semanal'));
-        $formato = strtolower((string) ($data['formato'] ?? 'excel'));
-
-        $vehiculoIds = collect($data['vehiculo_ids'] ?? [])
-            ->map(fn($id) => (int) $id)
-            ->filter(fn(int $id) => $id > 0)
-            ->unique()
-            ->values()
-            ->all();
-
         return [
-            'titulo'       => $titulo,
-            'modo'         => $modo,
-            'formato'      => $formato,
+            'titulo'       => (string) ($data['titulo'] ?? ''),
+            'modo'         => (string) ($data['modo'] ?? 'semanal'),
+            'formato'      => (string) ($data['formato'] ?? 'excel'),
             'fecha_desde'  => $fechaDesde,
             'fecha_hasta'  => $fechaHasta,
             'hora_desde'   => $horaDesdeStr,
             'hora_hasta'   => $horaHastaStr,
-            'vehiculo_ids' => $vehiculoIds,
+            'vehiculo_ids' => array_map('intval', $data['vehiculo_ids'] ?? []),
         ];
     }
 
