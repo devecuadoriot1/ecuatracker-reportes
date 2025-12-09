@@ -1,0 +1,116 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@config '../../../../tailwind.config.js';
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    /* DateTimeRangePicker - Flatpickr + horas integrados al tema */
+    .flatpickr-calendar {
+        border-radius: 0.75rem;
+        box-shadow: 0 10px 40px rgba(15, 23, 42, 0.45);
+        font-size: 0.875rem;
+        border: 1px solid rgb(229, 231, 235);
+    }
+
+    /* Modo claro */
+    html:not(.dark) .flatpickr-calendar {
+        background-color: #ffffff;
+        color: rgb(15, 23, 42);
+    }
+
+    /* Dias seleccionados / rango, usando el color primario de Filament */
+    html:not(.dark) .flatpickr-day.selected,
+    html:not(.dark) .flatpickr-day.startRange,
+    html:not(.dark) .flatpickr-day.endRange,
+    html:not(.dark) .flatpickr-day.inRange,
+    html:not(.dark) .flatpickr-day.selected:hover,
+    html:not(.dark) .flatpickr-day.startRange:hover,
+    html:not(.dark) .flatpickr-day.endRange:hover,
+    html:not(.dark) .flatpickr-day.inRange:hover {
+        background-color: rgb(var(--primary-600));
+        border-color: rgb(var(--primary-600));
+        color: #ffffff;
+    }
+
+    /* Modo oscuro: fondo y textos */
+    html.dark .flatpickr-calendar {
+        background-color: rgb(15, 23, 42);
+        color: rgb(226, 232, 240);
+        border-color: rgb(51, 65, 85);
+    }
+
+    html.dark .flatpickr-day {
+        color: rgb(226, 232, 240);
+    }
+
+    html.dark .flatpickr-weekday,
+    html.dark .flatpickr-current-month,
+    html.dark .flatpickr-months {
+        color: rgb(148, 163, 184);
+    }
+
+    /* Flechas de navegacion */
+    html.dark .flatpickr-prev-month svg,
+    html.dark .flatpickr-next-month svg {
+        fill: rgb(148, 163, 184);
+    }
+
+    /* Dias seleccionados / rango en modo oscuro: mismo primario */
+    html.dark .flatpickr-day.selected,
+    html.dark .flatpickr-day.startRange,
+    html.dark .flatpickr-day.endRange,
+    html.dark .flatpickr-day.inRange,
+    html.dark .flatpickr-day.selected:hover,
+    html.dark .flatpickr-day.startRange:hover,
+    html.dark .flatpickr-day.endRange:hover,
+    html.dark .flatpickr-day.inRange:hover {
+        background-color: rgb(var(--primary-500));
+        border-color: rgb(var(--primary-500));
+        color: rgb(15, 23, 42);
+    }
+
+    /* Borde al pasar el mouse por un dia */
+    .flatpickr-day:hover {
+        border-color: rgb(var(--primary-400));
+    }
+
+    /* Footer de horas personalizado */
+    .flatpickr-calendar .custom-time-range {
+        border-top: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .flatpickr-calendar .custom-time-range span {
+        font-size: 0.7rem;
+        color: rgb(148, 163, 184);
+    }
+
+    html.dark .flatpickr-calendar .custom-time-range span {
+        color: rgb(148, 163, 184);
+    }
+
+    .flatpickr-calendar .custom-time-range input[type='time'] {
+        background-color: rgb(248, 250, 252);
+        color: rgb(15, 23, 42);
+        border-radius: 0.375rem;
+        border: 1px solid rgb(209, 213, 219);
+        padding: 0.1rem 0.25rem;
+        font-size: 0.75rem;
+        outline: none;
+    }
+
+    html.dark .flatpickr-calendar .custom-time-range input[type='time'] {
+        background-color: rgb(15, 23, 42);
+        color: rgb(248, 250, 252);
+        border-color: rgb(75, 85, 99);
+    }
+
+    .flatpickr-calendar .custom-time-range input[type='time']:focus {
+        border-color: rgb(var(--primary-500));
+        box-shadow: 0 0 0 1px rgba(var(--primary-500), 0.5);
+    }
+}

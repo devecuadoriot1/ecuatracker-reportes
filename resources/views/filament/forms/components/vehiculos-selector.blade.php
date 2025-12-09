@@ -1,5 +1,10 @@
 @php
-/** @var array<int,array{title:string,items:array<int,array{id:int,label:string}>>> $groups */
+/**
+* @var array<int,array{
+    * title: string,
+    * items: array<int,array{id:int,label:string}>
+    * }> $groups
+    */
     $groups = $getGroupsForView();
     $statePath = $getStatePath();
     @endphp
@@ -20,7 +25,7 @@
             <x-filament::input.wrapper>
                 <button
                     type="button"
-                    class="fi-fo-select-input flex w-full items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm transition hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
+                    class="fi-fo-select-input flex w-full items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-gray-700 shadow-sm transition hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-200"
                     @click="togglePopup">
                     <span class="truncate" x-text="summaryLabel"></span>
 
@@ -36,9 +41,11 @@
                 x-transition
                 @click.outside="closePopup"
                 class="absolute z-50 mt-1 w-full">
-                <div class="border rounded-2xl bg-white shadow-xl dark:bg-gray-900 dark:border-gray-700">
-                    {{-- Búsqueda --}}
-                    <div class="p-3 border-b border-gray-200 dark:border-gray-800">
+                <div
+                    class="rounded-2xl border bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 flex flex-col"
+                    style="max-height: 700px;">
+                    {{-- Barra de búsqueda --}}
+                    <div class="border-b border-gray-200 px-3 py-2 dark:border-gray-800">
                         <x-filament::input.wrapper>
                             <x-filament::input
                                 type="text"
@@ -49,7 +56,7 @@
                     </div>
 
                     {{-- Contenido scrollable (alto fijo) --}}
-                    <div class="h-80 overflow-y-auto p-2 space-y-2">
+                    <div class="flex-1 space-y-2 overflow-y-auto p-2">
                         <template x-if="paginatedFilteredGroups().length === 0">
                             <div class="p-3 text-sm text-gray-500 dark:text-gray-400">
                                 No se encontraron vehículos.
@@ -57,14 +64,14 @@
                         </template>
 
                         <template x-for="group in paginatedFilteredGroups()" :key="group.title">
-                            <div class="border border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-950/40">
+                            <div class="rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-950/40">
                                 {{-- Cabecera del grupo --}}
                                 <div class="flex items-center justify-between px-3 py-2">
                                     <div class="flex items-center gap-2">
-                                        {{-- Flecha para expandir/colapsar --}}
+                                        {{-- Flecha expandir/colapsar --}}
                                         <button
                                             type="button"
-                                            class="inline-flex items-center justify-center rounded-full border border-transparent hover:bg-gray-100 dark:hover:bg-gray-800 h-6 w-6"
+                                            class="inline-flex h-6 w-6 items-center justify-center rounded-full border border-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
                                             @click="toggleGroupPanel(group.title)">
                                             <svg
                                                 x-show="isGroupOpen(group.title)"
@@ -85,7 +92,7 @@
                                         </button>
 
                                         {{-- Checkbox del grupo --}}
-                                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                                        <label class="flex cursor-pointer select-none items-center gap-2">
                                             <input
                                                 type="checkbox"
                                                 class="fi-fo-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900"
@@ -93,7 +100,7 @@
                                                 @click.stop
                                                 @change="toggleGroupSelection(group.title)">
                                             <span
-                                                class="font-medium text-sm text-gray-900 dark:text-gray-100"
+                                                class="text-sm font-medium text-gray-900 dark:text-gray-100"
                                                 x-text="group.title"></span>
                                         </label>
                                     </div>
@@ -104,10 +111,10 @@
                                     x-show="isGroupOpen(group.title)"
                                     x-transition
                                     class="px-3 pb-3 pt-1">
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                    <div class="grid grid-cols-1 gap-1 sm:grid-cols-2">
                                         <template x-for="item in group.items" :key="item.id">
                                             <div class="col-span-1">
-                                                <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+                                                <label class="flex cursor-pointer select-none items-center gap-2 text-sm">
                                                     <input
                                                         type="checkbox"
                                                         class="fi-fo-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-900"
@@ -126,12 +133,12 @@
 
                     {{-- Paginación (solo cuando NO hay búsqueda) --}}
                     <div
-                        class="flex items-center justify-between px-3 py-2 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400"
+                        class="flex items-center justify-between border-t border-gray-200 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400"
                         x-show="search.trim() === '' && totalPages() > 1">
                         <div class="inline-flex items-center gap-1">
                             <button
                                 type="button"
-                                class="px-2 py-1 border rounded-full disabled:opacity-40"
+                                class="rounded-full border px-2 py-1 disabled:opacity-40"
                                 @click="prevPage"
                                 :disabled="page <= 1">
                                 ‹
@@ -140,7 +147,7 @@
                             <template x-for="p in pages()" :key="p">
                                 <button
                                     type="button"
-                                    class="px-2 py-1 border rounded-full"
+                                    class="rounded-full border px-2 py-1"
                                     :class="p === page ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-gray-900'"
                                     @click="goToPage(p)"
                                     x-text="p"></button>
@@ -148,7 +155,7 @@
 
                             <button
                                 type="button"
-                                class="px-2 py-1 border rounded-full disabled:opacity-40"
+                                class="rounded-full border px-2 py-1 disabled:opacity-40"
                                 @click="nextPage"
                                 :disabled="page >= totalPages()">
                                 ›
@@ -178,6 +185,7 @@
                 state: config.state ?? [],
                 groups: config.groups ?? [],
                 groupsPerPage: config.groupsPerPage ?? 2,
+
                 open: false,
                 search: '',
                 page: 1,
@@ -186,16 +194,22 @@
                 itemIndex: {},
 
                 init() {
-                    // Índice id -> label para el resumen
+                    // Índice id -> label para el resumen y grupos abiertos por defecto
                     this.groups.forEach(group => {
                         this.openGroups[group.title] = true;
+
                         group.items.forEach(item => {
                             this.itemIndex[item.id] = item.label;
                         });
                     });
 
                     this.updateSummary();
+
+                    // Si Livewire cambia state desde PHP (reset, fill, etc.), actualizamos resumen
+                    this.$watch('state', () => this.updateSummary());
                 },
+
+                /* ---------- Popup ---------- */
 
                 togglePopup() {
                     this.open = !this.open;
@@ -204,6 +218,8 @@
                 closePopup() {
                     this.open = false;
                 },
+
+                /* ---------- Estado normalizado ---------- */
 
                 normalizedState() {
                     if (Array.isArray(this.state)) {
@@ -217,11 +233,7 @@
                     return [this.state];
                 },
 
-                // ---- helpers de grupos / items ----
-
-                allIds() {
-                    return this.groups.flatMap(group => group.items.map(item => item.id));
-                },
+                /* ---------- Helpers: grupos / items ---------- */
 
                 groupIds(title) {
                     const group = this.groups.find(g => g.title === title);
@@ -247,10 +259,11 @@
                     this.openGroups[title] = !this.isGroupOpen(title);
                 },
 
-                // ---- selección ----
+                /* ---------- Selección ---------- */
 
                 toggleItem(id) {
                     const current = this.normalizedState();
+
                     if (current.includes(id)) {
                         this.state = current.filter(v => v !== id);
                     } else {
@@ -278,7 +291,7 @@
                     this.updateSummary();
                 },
 
-                // ---- búsqueda + paginación por grupos ----
+                /* ---------- Búsqueda + paginación ---------- */
 
                 filteredGroups() {
                     const term = this.search.trim().toLowerCase();
@@ -303,7 +316,7 @@
                 paginatedFilteredGroups() {
                     const groups = this.filteredGroups();
 
-                    // Con búsqueda activa, se desactiva paginación
+                    // Con búsqueda activa no paginamos
                     if (this.search.trim() !== '') {
                         return groups;
                     }
@@ -342,7 +355,7 @@
                     this.goToPage(this.page + 1);
                 },
 
-                // ---- resumen para la caja principal ----
+                /* ---------- Resumen en la caja principal ---------- */
 
                 updateSummary() {
                     const ids = this.normalizedState();
